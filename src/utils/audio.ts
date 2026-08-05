@@ -1,4 +1,4 @@
-// Synthesizes instant sound feedback for gate scanning operations
+// Synthesizes instant sound feedback & haptic vibration for gate scanning operations
 
 class SoundFX {
   private ctx: AudioContext | null = null;
@@ -15,8 +15,20 @@ class SoundFX {
     }
   }
 
-  // Crisp high dual chime for valid check-in
+  // Trigger hardware vibration if available (200-300ms)
+  private triggerVibration(pattern: number | number[]) {
+    if (typeof window !== 'undefined' && 'navigator' in window && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(pattern);
+      } catch {
+        // Fallback if browser blocks vibration API
+      }
+    }
+  }
+
+  // Crisp high dual chime for valid check-in (🟢 Valid / Inside)
   playSuccess() {
+    this.triggerVibration(200);
     try {
       this.initCtx();
       if (!this.ctx) return;
@@ -51,8 +63,9 @@ class SoundFX {
     }
   }
 
-  // Low double warning buzz for duplicate scan attempt (Already Inside)
+  // Double warning buzz for duplicate scan attempt (🟡 Already Inside / Warning)
   playWarning() {
+    this.triggerVibration([100, 50, 100]);
     try {
       this.initCtx();
       if (!this.ctx) return;
@@ -62,24 +75,25 @@ class SoundFX {
       const gain = this.ctx.createGain();
 
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(220, now);
-      osc.frequency.setValueAtTime(180, now + 0.1);
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.setValueAtTime(220, now + 0.1);
 
       gain.gain.setValueAtTime(0.3, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
       osc.start(now);
-      osc.stop(now + 0.35);
+      osc.stop(now + 0.3);
     } catch {
       // Audio context error fallback silent
     }
   }
 
-  // Heavy low buzz for blocked / cancelled / invalid ticket scan
+  // Heavy double low buzz for blocked / cancelled / invalid ticket scan (🔴 Invalid)
   playError() {
+    this.triggerVibration([150, 75, 150]);
     try {
       this.initCtx();
       if (!this.ctx) return;
@@ -89,23 +103,23 @@ class SoundFX {
       const gain = this.ctx.createGain();
 
       osc.type = 'square';
-      osc.frequency.setValueAtTime(140, now);
-      osc.frequency.linearRampToValueAtTime(90, now + 0.3);
+      osc.frequency.setValueAtTime(160, now);
+      osc.frequency.linearRampToValueAtTime(100, now + 0.25);
 
-      gain.gain.setValueAtTime(0.4, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
       osc.start(now);
-      osc.stop(now + 0.35);
+      osc.stop(now + 0.3);
     } catch {
       // Audio fallback
     }
   }
 
-  // Subtle tap click for status updates
+  // Subtle tap click for UI navigation
   playClick() {
     try {
       this.initCtx();
@@ -117,14 +131,14 @@ class SoundFX {
 
       osc.type = 'sine';
       osc.frequency.setValueAtTime(600, now);
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
       osc.start(now);
-      osc.stop(now + 0.05);
+      osc.stop(now + 0.04);
     } catch {
       // Audio fallback
     }

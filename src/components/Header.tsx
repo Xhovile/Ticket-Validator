@@ -1,5 +1,5 @@
 import React from 'react';
-import { QrCode, ShieldCheck, User as UserIcon, LogOut, Radio } from 'lucide-react';
+import { ScanLine, ShieldCheck, User as UserIcon, LogOut, Radio } from 'lucide-react';
 import { User, CheckInSession } from '../types';
 import { INITIAL_USERS } from '../data/mockData';
 
@@ -17,24 +17,24 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onSwitchUser,
   activeSession,
-  activeEventName,
 }) => {
   const [showUserDropdown, setShowUserDropdown] = React.useState(false);
 
   return (
-    <header className="sticky top-0 z-40 bg-[#0f0f0f]/95 backdrop-blur-md border-b border-[#26282e] px-4 py-3 shadow-md">
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-4 py-2.5">
       <div className="max-w-md mx-auto flex items-center justify-between">
         {/* Brand & App Identifier */}
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#8db600]/10 border border-[#8db600]/30 flex items-center justify-center text-[#8db600] shadow-sm">
-            <QrCode className="w-4 h-4" />
+          <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center">
+            <ScanLine className="w-4 h-4" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">BuyMeShow</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#8db600] animate-pulse"></span>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">
+                BuyMesho
+              </span>
             </div>
-            <h1 className="text-sm font-bold text-white leading-none tracking-tight flex items-center gap-1">
+            <h1 className="text-xs font-semibold text-slate-900 leading-tight tracking-tight">
               Ticket Validator
             </h1>
           </div>
@@ -43,8 +43,8 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right Section: Active Gate Badge & User Menu */}
         <div className="flex items-center gap-2">
           {activeSession && activeSession.active ? (
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#8db600]/10 border border-[#8db600]/30 text-[#8db600] text-xs font-medium">
-              <Radio className="w-3 h-3 text-[#8db600] animate-pulse" />
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-medium">
+              <Radio className="w-3 h-3 text-emerald-600" />
               <span className="truncate max-w-[100px]">{activeSession.gateName}</span>
             </div>
           ) : null}
@@ -53,17 +53,17 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2 p-1 pl-2 rounded-full bg-[#16171b] border border-[#26282e] hover:border-gray-700 transition text-left focus:outline-none"
+                className="flex items-center gap-2 p-1 pl-2.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 transition text-left focus:outline-none min-h-[36px]"
               >
                 <div className="text-right hidden sm:block">
-                  <div className="text-xs font-medium text-white leading-tight truncate max-w-[90px]">{user.name}</div>
-                  <div className="text-[10px] text-[#8db600] capitalize">{user.role === 'organizer' ? 'Organizer' : 'Gate Staff'}</div>
+                  <div className="text-xs font-medium text-slate-900 leading-tight truncate max-w-[90px]">{user.name}</div>
+                  <div className="text-[10px] text-slate-500 capitalize">{user.role === 'organizer' ? 'Organizer' : 'Gate Staff'}</div>
                 </div>
 
                 {user.avatarUrl ? (
-                  <img src={user.avatarUrl} alt={user.name} className="w-7 h-7 rounded-full object-cover border border-[#8db600]/40" />
+                  <img src={user.avatarUrl} alt={user.name} className="w-7 h-7 rounded-lg object-cover border border-slate-200" />
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-[#8db600]/20 text-[#8db600] flex items-center justify-center text-xs font-bold border border-[#8db600]/30">
+                  <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center text-xs font-semibold border border-slate-200">
                     {user.name.charAt(0)}
                   </div>
                 )}
@@ -72,18 +72,18 @@ export const Header: React.FC<HeaderProps> = ({
               {/* User Dropdown */}
               {showUserDropdown && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowUserDropdown(false)} />
-                  <div className="absolute right-0 mt-2 w-64 bg-[#16171b] border border-[#26282e] rounded-xl shadow-2xl z-50 p-2 text-xs">
-                    <div className="p-2 border-b border-[#26282e] mb-1">
-                      <p className="font-semibold text-white">{user.name}</p>
-                      <p className="text-gray-400 text-[11px] truncate">{user.email}</p>
-                      <div className="mt-1.5 flex items-center gap-1 text-[#8db600] text-[10px]">
-                        <ShieldCheck className="w-3 h-3" />
-                        <span>{user.assignedEventIds.length} Event Permissions Granted</span>
+                  <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-xs" onClick={() => setShowUserDropdown(false)} />
+                  <div className="absolute right-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-lg z-50 p-2 text-xs">
+                    <div className="p-2 border-b border-slate-100 mb-1">
+                      <p className="font-semibold text-slate-900">{user.name}</p>
+                      <p className="text-slate-500 text-[11px] truncate">{user.email}</p>
+                      <div className="mt-1 flex items-center gap-1 text-slate-500 text-[10px] font-medium">
+                        <ShieldCheck className="w-3 h-3 text-blue-600" />
+                        <span>{user.assignedEventIds.length} Assigned Events</span>
                       </div>
                     </div>
 
-                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
+                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
                       Switch Demo Account
                     </div>
 
@@ -94,25 +94,25 @@ export const Header: React.FC<HeaderProps> = ({
                           onSwitchUser(u);
                           setShowUserDropdown(false);
                         }}
-                        className={`w-full flex items-center gap-2 p-2 rounded-lg text-left transition ${
-                          u.id === user.id ? 'bg-[#8db600]/10 text-[#8db600] font-medium border border-[#8db600]/30' : 'text-gray-300 hover:bg-[#202228]'
+                        className={`w-full flex items-center gap-2 p-2 rounded-lg text-left transition min-h-[36px] ${
+                          u.id === user.id ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-700 hover:bg-slate-50'
                         }`}
                       >
-                        <UserIcon className="w-3.5 h-3.5 text-gray-400" />
+                        <UserIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <div className="truncate flex-1">
-                          <p className="truncate">{u.name}</p>
-                          <p className="text-[10px] text-gray-500 capitalize">{u.role} ({u.assignedEventIds.length} events)</p>
+                          <p className="truncate font-medium">{u.name}</p>
+                          <p className="text-[10px] text-slate-500 capitalize">{u.role} ({u.assignedEventIds.length} events)</p>
                         </div>
                       </button>
                     ))}
 
-                    <div className="mt-1 pt-1 border-t border-[#26282e]">
+                    <div className="mt-1 pt-1 border-t border-slate-100">
                       <button
                         onClick={() => {
                           setShowUserDropdown(false);
                           onLogout();
                         }}
-                        className="w-full flex items-center gap-2 p-2 rounded-lg text-red-400 hover:bg-red-950/30 text-left transition"
+                        className="w-full flex items-center gap-2 p-2 rounded-lg text-rose-600 hover:bg-rose-50 text-left transition font-medium min-h-[36px]"
                       >
                         <LogOut className="w-3.5 h-3.5" />
                         <span>Sign Out</span>
@@ -123,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
           ) : (
-            <span className="text-xs text-gray-400">Not Logged In</span>
+            <span className="text-xs text-slate-500 font-medium">Not Logged In</span>
           )}
         </div>
       </div>

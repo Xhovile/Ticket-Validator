@@ -4,7 +4,7 @@ export const INITIAL_USERS: User[] = [
   {
     id: 'user-sarah',
     name: 'Sarah Jenkins',
-    email: 'sarah@buymeshow.com',
+    email: 'sarah@buymesho.com',
     role: 'gate_staff',
     assignedEventIds: ['evt-neon-2026', 'evt-tech-2026'],
     assignedGate: 'Gate A - Main Entrance',
@@ -13,7 +13,7 @@ export const INITIAL_USERS: User[] = [
   {
     id: 'user-alex',
     name: 'Alex Vance',
-    email: 'alex@buymeshow.com',
+    email: 'alex@buymesho.com',
     role: 'organizer',
     assignedEventIds: ['evt-neon-2026', 'evt-tech-2026', 'evt-indie-2026'],
     assignedGate: 'Organizer Admin',
@@ -35,7 +35,7 @@ export const INITIAL_EVENTS: EventItem[] = [
     id: 'evt-neon-2026',
     name: 'Neon Horizon Music Festival 2026',
     organizerId: 'user-alex',
-    organizerName: 'BuyMeShow Live & Alex Vance',
+    organizerName: 'BuyMesho Live & Alex Vance',
     date: 'Today, 6:00 PM - 2:00 AM',
     venue: 'Skyline Amphitheater',
     city: 'San Francisco, CA',
@@ -167,7 +167,7 @@ export const INITIAL_TICKETS: Ticket[] = [
     price: 60,
     purchaseDate: '2026-06-10',
     status: 'Refunded',
-    notes: 'Refund processed via BuyMeShow portal',
+    notes: 'Refund processed via BuyMesho portal',
   },
   {
     id: 'BMS-8491-06',
@@ -291,11 +291,11 @@ export const INITIAL_LOGS: ActivityLogEntry[] = [
 
 // Helper functions for storage management
 const STORAGE_KEYS = {
-  USER: 'buymeshow_validator_user',
-  EVENTS: 'buymeshow_validator_events',
-  TICKETS: 'buymeshow_validator_tickets',
-  LOGS: 'buymeshow_validator_logs',
-  SESSION: 'buymeshow_validator_session',
+  USER: 'buymesho_validator_user',
+  EVENTS: 'buymesho_validator_events',
+  TICKETS: 'buymesho_validator_tickets',
+  LOGS: 'buymesho_validator_logs',
+  SESSION: 'buymesho_validator_session',
 };
 
 export function loadStoredUser(): User {

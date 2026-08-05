@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, Radio, Zap, Search, AlertCircle, ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
-import { EventItem, CheckInSession, Ticket, TicketStatus } from '../types';
-import { soundFX } from '../utils/audio';
+import { Camera, ScanLine, Search, ArrowLeft } from 'lucide-react';
+import { EventItem, CheckInSession, Ticket } from '../types';
 
 interface ScannerViewProps {
   event: EventItem;
@@ -22,9 +21,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   onStartSessionRequest,
 }) => {
   const [cameraActive, setCameraActive] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState('');
-  const [torchOn, setTorchOn] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const regionId = 'html5qr-code-full-region';
 
@@ -55,15 +52,13 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           )
           .then(() => {
             setCameraActive(true);
-            setCameraError(null);
           })
           .catch((err) => {
             console.log('Camera start fallback:', err);
             setCameraActive(false);
-            setCameraError('Camera access unavailable or blocked. You can use manual entry or quick test scan buttons below.');
           });
       } catch (e) {
-        setCameraError('Camera initialization fallback');
+        setCameraActive(false);
       }
     }
 
@@ -95,27 +90,28 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   if (!session || !session.active) {
     return (
       <div className="min-h-[75vh] flex flex-col items-center justify-center px-4 text-center max-w-md mx-auto space-y-4">
-        <div className="w-16 h-16 rounded-full bg-[#8db600]/10 border border-[#8db600]/40 flex items-center justify-center text-[#8db600] shadow-xl">
-          <Radio className="w-8 h-8 animate-pulse" />
+        <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shadow-md">
+          <ScanLine className="w-8 h-8" />
         </div>
         <div className="space-y-1">
-          <h2 className="text-xl font-bold text-white">No Active Check-in Session</h2>
-          <p className="text-xs text-gray-400">
+          <h2 className="text-xl font-bold text-slate-900">No Active Check-in Session</h2>
+          <p className="text-xs text-slate-500 max-w-xs mx-auto">
             You must initialize a gate session for <strong>{event.name}</strong> before scanning tickets.
           </p>
         </div>
 
+        {/* Solid Deep Blue Primary Button */}
         <button
           onClick={onStartSessionRequest}
-          className="w-full py-3.5 px-4 bg-[#8db600] hover:bg-[#9ef01a] text-[#0f0f0f] font-bold text-xs rounded-xl shadow-lg shadow-[#8db600]/20 flex items-center justify-center gap-2 transition"
+          className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition min-h-[44px]"
         >
-          <Radio className="w-4 h-4" />
+          <ScanLine className="w-4 h-4" />
           <span>Start Gate Session Now</span>
         </button>
 
         <button
           onClick={onBackToEvent}
-          className="text-xs text-gray-400 hover:text-white underline pt-2"
+          className="text-xs text-slate-500 hover:text-slate-900 underline pt-2 font-medium min-h-[40px] flex items-center justify-center"
         >
           Back to Event Details
         </button>
@@ -124,105 +120,94 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   }
 
   return (
-    <div className="min-h-[85vh] bg-[#0f0f0f] text-white flex flex-col justify-between pb-24 pt-2 px-4 max-w-md mx-auto">
+    <div className="min-h-[85vh] bg-slate-50 text-slate-900 flex flex-col justify-between pb-24 pt-2 px-4 max-w-md mx-auto">
       {/* Sleek Top Gate Info */}
-      <div className="flex items-center justify-between py-2 border-b border-[#26282e]">
+      <div className="flex items-center justify-between py-2 border-b border-slate-200 bg-white px-3 rounded-xl border">
         <button
           onClick={onBackToEvent}
-          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition"
+          className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition min-h-[32px]"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           <span>Event</span>
         </button>
 
-        <div className="flex items-center gap-2 text-center">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#8db600] opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#8db600]"></span>
-          </span>
-          <div>
-            <span className="text-xs font-bold text-[#8db600]">{session.gateName}</span>
-            <span className="text-[10px] text-gray-400 block">{session.staffName}</span>
-          </div>
+        <div className="text-center">
+          <span className="text-xs font-semibold text-slate-900">{session.gateName}</span>
+          <span className="text-[10px] text-slate-500 block">{session.staffName}</span>
         </div>
 
-        <span className="px-2 py-0.5 rounded bg-[#16171b] border border-[#26282e] text-[10px] text-gray-300 font-mono">
+        <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] text-slate-700 font-mono font-medium">
           {session.scanCount} Scanned
         </span>
       </div>
 
-      {/* Main Scanner View - Ultra Clean Design */}
-      <div className="my-auto py-4 space-y-4">
-        <div className="relative w-full aspect-square max-w-[320px] mx-auto rounded-3xl overflow-hidden bg-[#16171b] border-2 border-[#8db600]/40 shadow-2xl shadow-[#8db600]/10">
+      {/* Main Scanner View - Outdoor High Contrast Design */}
+      <div className="my-auto py-3 space-y-4">
+        <div className="relative w-full aspect-square max-w-[300px] mx-auto rounded-2xl overflow-hidden bg-slate-900 border border-slate-800">
           
           {/* HTML5 QR Code Container */}
           <div id={regionId} className="w-full h-full object-cover overflow-hidden" />
 
           {/* Scanner Reticle Overlay */}
-          <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-8">
+          <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-5">
             {/* Top Bar Label */}
-            <div className="px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-[#8db600]/40 text-[11px] font-semibold text-[#8db600] flex items-center gap-1.5 shadow-lg">
-              <span className="w-2 h-2 rounded-full bg-[#8db600] animate-ping" />
+            <div className="px-3 py-0.5 rounded-full bg-slate-900/80 backdrop-blur-sm border border-slate-700 text-[10px] font-medium text-slate-200 flex items-center gap-1.5">
               <span>Ready to Scan</span>
             </div>
 
             {/* Target Box Corners */}
-            <div className="w-48 h-48 relative flex items-center justify-center">
-              {/* Top Left Corner */}
-              <div className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-[#8db600] rounded-tl-xl" />
-              {/* Top Right Corner */}
-              <div className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-[#8db600] rounded-tr-xl" />
-              {/* Bottom Left Corner */}
-              <div className="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-[#8db600] rounded-bl-xl" />
-              {/* Bottom Right Corner */}
-              <div className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-[#8db600] rounded-br-xl" />
+            <div className="w-44 h-44 relative flex items-center justify-center">
+              <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-blue-500 rounded-tl-lg" />
+              <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-blue-500 rounded-tr-lg" />
+              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-blue-500 rounded-bl-lg" />
+              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-blue-500 rounded-br-lg" />
 
               {/* Laser Scanning Bar */}
-              <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#8db600] to-transparent shadow-[0_0_12px_#8db600] animate-pulse" />
+              <div className="w-full h-0.5 bg-blue-500/80 animate-pulse" />
             </div>
 
             {/* Bottom Camera Hint */}
-            <p className="text-[11px] text-gray-300 font-medium bg-black/60 px-3 py-1 rounded-full backdrop-blur-md">
-              Center BuyMeShow QR code in frame
+            <p className="text-[10px] text-slate-300 font-medium bg-slate-900/80 px-2.5 py-0.5 rounded-full backdrop-blur-sm">
+              Align QR code within reticle
             </p>
           </div>
 
           {!cameraActive && (
-            <div className="absolute inset-0 bg-[#0f0f0f]/90 flex flex-col items-center justify-center p-6 text-center space-y-3 z-10">
-              <Camera className="w-10 h-10 text-[#8db600] animate-bounce" />
+            <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center space-y-3 z-10 text-white">
+              <Camera className="w-8 h-8 text-slate-400" />
               <div className="space-y-1">
-                <p className="text-xs font-bold text-white">Camera View Active</p>
-                <p className="text-[11px] text-gray-400">Point phone at attendee ticket QR code or tap a test ticket below.</p>
+                <p className="text-xs font-semibold text-white">Camera View Active</p>
+                <p className="text-[11px] text-slate-400">Point camera at attendee ticket QR code or tap a test ticket below.</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Manual Code Entry */}
-        <form onSubmit={handleManualSubmit} className="max-w-[320px] mx-auto flex items-center gap-2">
+        <form onSubmit={handleManualSubmit} className="max-w-[300px] mx-auto flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
+            <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
               placeholder="Enter Ticket ID (e.g. BMS-8491-01)"
-              className="w-full pl-9 pr-3 py-2 bg-[#16171b] border border-[#26282e] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#8db600] focus:ring-1 focus:ring-[#8db600]"
+              className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 min-h-[40px]"
             />
           </div>
           <button
             type="submit"
-            className="py-2 px-3 bg-[#8db600] hover:bg-[#9ef01a] text-[#0f0f0f] font-bold text-xs rounded-xl transition shrink-0"
+            className="py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-xl transition shrink-0 min-h-[40px]"
           >
             Check
           </button>
         </form>
 
         {/* Quick Demo Test Buttons */}
-        <div className="max-w-[320px] mx-auto space-y-1.5 pt-2">
-          <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-gray-400 font-semibold px-1">
-            <span>Instant Test QR Triggers</span>
-            <span>Tap to simulate scan</span>
+        <div className="max-w-[300px] mx-auto space-y-1.5 pt-1">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-slate-500 font-semibold px-1">
+            <span>Instant Test Triggers</span>
+            <span>Tap to simulate</span>
           </div>
 
           <div className="grid grid-cols-2 gap-1.5">
@@ -230,21 +215,21 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
               <button
                 key={t.id}
                 onClick={() => handleSimulateScan(t.qrPayload)}
-                className="p-2 rounded-xl bg-[#16171b] hover:bg-[#202228] border border-[#26282e] text-left transition text-xs space-y-0.5 group"
+                className="p-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-left transition text-xs space-y-0.5 group min-h-[44px] shadow-2xs"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-white truncate text-[11px] group-hover:text-[#8db600]">{t.attendeeName}</span>
-                  <span className={`text-[9px] px-1 rounded font-mono ${
-                    t.status === 'Inside' ? 'bg-amber-950 text-amber-300' :
-                    t.status === 'Cancelled' || t.status === 'Blocked' ? 'bg-red-950 text-red-300' :
-                    'bg-[#8db600]/20 text-[#8db600]'
+                  <span className="font-semibold text-slate-900 truncate text-[11px] group-hover:text-blue-600">{t.attendeeName}</span>
+                  <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-medium ${
+                    t.status === 'Inside' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                    t.status === 'Cancelled' || t.status === 'Blocked' || t.status === 'Refunded' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                    'bg-emerald-50 text-emerald-700 border border-emerald-200'
                   }`}>
                     {t.status}
                   </span>
                 </div>
-                <div className="text-[10px] text-gray-400 font-mono flex items-center justify-between">
+                <div className="text-[10px] text-slate-500 font-mono flex items-center justify-between font-medium">
                   <span>#{t.id}</span>
-                  <span className="text-gray-500">{t.ticketTier.split(' ')[0]}</span>
+                  <span className="text-slate-400">{t.ticketTier.split(' ')[0]}</span>
                 </div>
               </button>
             ))}

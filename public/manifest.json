@@ -1,0 +1,9 @@
+{
+  "short_name": "GateValidator",
+  "name": "BuyMesho Gate Ticket Validator",
+  "icons": [],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "display": "standalone"
+}

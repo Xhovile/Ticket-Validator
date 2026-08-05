@@ -1,6 +1,6 @@
 {
   "name": "Ticket Validator",
-  "description": "Mobile-first ticket validation and gate check-in app for BuyMeShow organizers and gate staff.",
+  "description": "Mobile-first ticket validation and gate check-in app for BuyMesho organizers and gate staff.",
   "requestFramePermissions": [
     "camera"
   ],

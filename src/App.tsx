@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import { User, EventItem, Ticket, TicketStatus, ActivityLogEntry, CheckInSession } from './types';
 import {
   loadStoredUser,
@@ -11,12 +12,18 @@ import {
   saveStoredLogs,
   loadStoredSession,
   saveStoredSession,
-  resetAllDataToDefault,
 } from './data/mockData';
 import { soundFX } from './utils/audio';
+import {
+  getOfflineQueue,
+  enqueueValidation,
+  clearOfflineQueue,
+  QueuedValidation,
+} from './utils/offlineSyncManager';
 
 // Components
 import { Header } from './components/Header';
+import { OfflineSyncBanner } from './components/OfflineSyncBanner';
 import { FooterNavigation, NavTab } from './components/FooterNavigation';
 import { LoginView } from './components/LoginView';
 import { EventsView } from './components/EventsView';
@@ -25,13 +32,18 @@ import { CheckInSessionModal } from './components/CheckInSessionModal';
 import { ScannerView } from './components/ScannerView';
 import { ScanResultCard } from './components/ScanResultCard';
 import { AttendeesView } from './components/AttendeesView';
-import { ActivityLogView } from './components/ActivityLogView';
 import { TicketDetailModal } from './components/TicketDetailModal';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => loadStoredUser());
   const [events, setEvents] = useState<EventItem[]>(() => loadStoredEvents());
-  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(() => events[0] || null);
+  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(() => {
+    const user = loadStoredUser();
+    const evts = loadStoredEvents();
+    if (!user) return evts[0] || null;
+    const authEvts = evts.filter(e => user.role === 'organizer' ? e.organizerId === user.id : user.assignedEventIds.includes(e.id));
+    return authEvts[0] || null;
+  });
   const [tickets, setTickets] = useState<Ticket[]>(() => loadStoredTickets());
   const [logs, setLogs] = useState<ActivityLogEntry[]>(() => loadStoredLogs());
   const [activeSession, setActiveSession] = useState<CheckInSession | null>(() => loadStoredSession());
@@ -47,8 +59,84 @@ export default function App() {
     ticket: Ticket;
     scanTime: string;
     isDuplicate: boolean;
+    isOfflineQueued?: boolean;
   } | null>(null);
   const [selectedTicketForDetail, setSelectedTicketForDetail] = useState<Ticket | null>(null);
+
+  // Offline & Background Sync state
+  const [isOnline, setIsOnline] = useState<boolean>(() => navigator.onLine);
+  const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
+  const [offlineQueue, setOfflineQueue] = useState<QueuedValidation[]>(() => getOfflineQueue());
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
+
+  const handleSyncNow = async () => {
+    const queue = getOfflineQueue();
+    if (queue.length === 0) return;
+    setIsSyncing(true);
+
+    // Simulate background network sync with BuyMesho server
+    await new Promise((res) => setTimeout(res, 800));
+
+    const count = queue.length;
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const syncLog: ActivityLogEntry = {
+      id: `log-${Date.now()}`,
+      timestamp,
+      eventId: selectedEvent?.id || 'evt-neon-2026',
+      action: 'Checked In (Inside)',
+      gateName: activeSession?.gateName || 'Main Gate',
+      staffName: currentUser?.name || 'Gate Officer',
+      statusBadge: 'success',
+      details: `Background Sync: ${count} offline ticket validation${count > 1 ? 's' : ''} synced with server`,
+    };
+
+    setLogs((prev) => [syncLog, ...prev]);
+    clearOfflineQueue();
+    setOfflineQueue([]);
+    setIsSyncing(false);
+    soundFX.playSuccess();
+
+    setSyncToastMessage(`Successfully synced ${count} offline ticket validation${count > 1 ? 's' : ''} with BuyMesho server!`);
+    setTimeout(() => setSyncToastMessage(null), 4000);
+  };
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      const queue = getOfflineQueue();
+      if (queue.length > 0) {
+        handleSyncNow();
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    if ('serviceWorker' in navigator) {
+      const messageHandler = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'BACKGROUND_SYNC_TRIGGERED') {
+          handleSyncNow();
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', messageHandler);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+        navigator.serviceWorker.removeEventListener('message', messageHandler);
+      };
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Save states to localStorage whenever they mutate
   useEffect(() => {
@@ -75,6 +163,8 @@ export default function App() {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setPermissionError(null);
+    const userEvts = events.filter(e => user.role === 'organizer' ? e.organizerId === user.id : user.assignedEventIds.includes(e.id));
+    setSelectedEvent(userEvts[0] || null);
     soundFX.playSuccess();
   };
 
@@ -88,6 +178,8 @@ export default function App() {
   const handleSwitchUser = (newUser: User) => {
     setCurrentUser(newUser);
     setPermissionError(null);
+    const userEvts = events.filter(e => newUser.role === 'organizer' ? e.organizerId === newUser.id : newUser.assignedEventIds.includes(e.id));
+    setSelectedEvent(userEvts[0] || null);
     soundFX.playClick();
   };
 
@@ -105,7 +197,7 @@ export default function App() {
     if (!hasPermission) {
       soundFX.playError();
       setPermissionError(
-        `Permission Denied: Account '${currentUser.name}' does not have gate scanning authorization for '${event.name}'. Contact event organizer on BuyMeShow.`
+        `Permission Denied: Account '${currentUser.name}' does not have gate scanning authorization for '${event.name}'. Contact event organizer on BuyMesho.`
       );
       return;
     }
@@ -144,6 +236,7 @@ export default function App() {
 
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const cleanCode = scannedCode.trim().toLowerCase();
+    const effectiveOffline = !isOnline || isSimulatedOffline;
 
     // Find ticket by QR payload or Ticket ID
     const foundTicket = tickets.find(
@@ -179,7 +272,7 @@ export default function App() {
         price: 0,
         purchaseDate: 'N/A',
         status: 'Blocked',
-        notes: 'Barcode not found in BuyMeShow database',
+        notes: 'Barcode not found in BuyMesho database',
       };
 
       setActiveScanResult({
@@ -241,7 +334,7 @@ export default function App() {
     } else {
       // Valid entry! Auto-check inside
       soundFX.playSuccess();
-      updateTicketStatus(foundTicket.id, 'Inside', activeSession.gateName, currentUser.name, timestamp);
+      updateTicketStatus(foundTicket.id, 'Inside', activeSession.gateName, currentUser.name, timestamp, effectiveOffline);
 
       const updatedTicket: Ticket = {
         ...foundTicket,
@@ -255,6 +348,7 @@ export default function App() {
         ticket: updatedTicket,
         scanTime: timestamp,
         isDuplicate: false,
+        isOfflineQueued: effectiveOffline,
       });
     }
   };
@@ -265,11 +359,29 @@ export default function App() {
     newStatus: TicketStatus,
     gateNameOverride?: string,
     staffNameOverride?: string,
-    timestampOverride?: string
+    timestampOverride?: string,
+    isOfflineAction?: boolean
   ) => {
     const timestamp = timestampOverride || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const gate = gateNameOverride || activeSession?.gateName || 'Main Gate';
     const staff = staffNameOverride || currentUser?.name || 'Gate Officer';
+    const effectiveOffline = isOfflineAction !== undefined ? isOfflineAction : (!isOnline || isSimulatedOffline);
+
+    const targetTicket = tickets.find((t) => t.id === ticketId);
+    if (targetTicket && effectiveOffline) {
+      enqueueValidation({
+        ticketId,
+        eventId: targetTicket.eventId,
+        attendeeName: targetTicket.attendeeName,
+        ticketTier: targetTicket.ticketTier,
+        actionType: newStatus === 'Inside' ? 'check_in' : 'status_change',
+        newStatus,
+        previousStatus: targetTicket.status,
+        gateName: gate,
+        staffName: staff,
+      });
+      setOfflineQueue(getOfflineQueue());
+    }
 
     setTickets((prev) =>
       prev.map((t) => {
@@ -324,8 +436,6 @@ export default function App() {
       badge = 'info';
     }
 
-    const targetTicket = tickets.find((t) => t.id === ticketId);
-
     const logEntry: ActivityLogEntry = {
       id: `log-${Date.now()}`,
       timestamp,
@@ -336,7 +446,7 @@ export default function App() {
       gateName: gate,
       staffName: staff,
       statusBadge: badge,
-      details: `Gate action: Ticket status updated to ${newStatus}`,
+      details: effectiveOffline ? 'Validated Offline (Queued for Sync)' : `Gate action: Ticket status updated to ${newStatus}`,
     };
 
     setLogs((prev) => [logEntry, ...prev]);
@@ -345,7 +455,7 @@ export default function App() {
   // If not logged in, show Login view
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-[#0c0d10] text-gray-100 font-sans selection:bg-emerald-500 selection:text-black">
+      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-blue-600 selection:text-white">
         <Header
           user={null}
           onLogout={handleLogout}
@@ -360,8 +470,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0c0d10] text-gray-100 font-sans antialiased selection:bg-emerald-500 selection:text-black">
-      {/* Sleek Simple Header */}
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
+      {/* Header */}
       <Header
         user={currentUser}
         onLogout={handleLogout}
@@ -369,6 +479,28 @@ export default function App() {
         activeSession={activeSession}
         activeEventName={selectedEvent?.name}
       />
+
+      {/* Offline & Background Sync Banner */}
+      <OfflineSyncBanner
+        isOnline={isOnline}
+        isSimulatedOffline={isSimulatedOffline}
+        queuedItems={offlineQueue}
+        isSyncing={isSyncing}
+        onToggleSimulatedOffline={() => setIsSimulatedOffline((prev) => !prev)}
+        onSyncNow={handleSyncNow}
+        onClearQueue={() => {
+          clearOfflineQueue();
+          setOfflineQueue([]);
+        }}
+      />
+
+      {/* Sync Notification Toast */}
+      {syncToastMessage && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-bold border border-emerald-400 animate-in fade-in slide-in-from-top-4">
+          <CheckCircle2 className="w-4 h-4 text-white" />
+          <span>{syncToastMessage}</span>
+        </div>
+      )}
 
       {/* Main View Container */}
       <main className="transition-all duration-200">
@@ -423,14 +555,6 @@ export default function App() {
             }}
           />
         )}
-
-        {currentTab === 'activity' && selectedEvent && (
-          <ActivityLogView
-            event={selectedEvent}
-            logs={logs}
-            onClearLogs={() => setLogs([])}
-          />
-        )}
       </main>
 
       {/* Scan Result Overlay Popover */}
@@ -439,6 +563,7 @@ export default function App() {
           ticket={activeScanResult.ticket}
           scanTime={activeScanResult.scanTime}
           isDuplicateScan={activeScanResult.isDuplicate}
+          isOfflineQueued={activeScanResult.isOfflineQueued}
           onUpdateStatus={(newStatus) => {
             updateTicketStatus(activeScanResult.ticket.id, newStatus);
             setActiveScanResult(null);
@@ -470,7 +595,7 @@ export default function App() {
         />
       )}
 
-      {/* Sleek Simple Footer Navigation */}
+      {/* Footer Navigation */}
       <FooterNavigation
         currentTab={currentTab}
         onTabChange={(tab) => {
@@ -479,7 +604,6 @@ export default function App() {
         }}
         isScanningActive={Boolean(activeSession && activeSession.active)}
         hasActiveEvent={Boolean(selectedEvent)}
-        activityCount={logs.filter((l) => l.eventId === selectedEvent?.id).length}
       />
     </div>
   );
