@@ -1,0 +1,10 @@
+{
+  "name": "Ticket Validator",
+  "description": "Mobile-first ticket validation and gate check-in app for BuyMeShow organizers and gate staff.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
