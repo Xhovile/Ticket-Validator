@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Wifi, WifiOff, RefreshCw, CheckCircle2, ChevronDown, ChevronUp, Clock, CloudOff } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Wifi, WifiOff, RefreshCw, CheckCircle2, ChevronDown, ChevronUp, Clock, CloudOff, X } from 'lucide-react';
 import { QueuedValidation } from '../utils/offlineSyncManager';
 
 interface OfflineSyncBannerProps {
@@ -12,6 +12,45 @@ interface OfflineSyncBannerProps {
   onClearQueue: () => void;
 }
 
+const CircularProgress: React.FC<{ progress: number; size?: number; strokeWidth?: number }> = ({
+  progress,
+  size = 18,
+  strokeWidth = 2.5,
+}) => {
+  const center = size / 2;
+  const radius = center - strokeWidth;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (Math.min(100, Math.max(0, progress)) / 100) * circumference;
+
+  return (
+    <div className="relative inline-flex items-center justify-center shrink-0">
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          className="text-slate-800"
+          strokeWidth={strokeWidth}
+          stroke="currentColor"
+          fill="transparent"
+        />
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          className="text-blue-400 transition-all duration-100 ease-linear"
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          stroke="currentColor"
+          fill="transparent"
+        />
+      </svg>
+    </div>
+  );
+};
+
 export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({
   isOnline,
   isSimulatedOffline,
@@ -22,23 +61,109 @@ export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({
   onClearQueue,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'complete'>('idle');
+  const [syncProgress, setSyncProgress] = useState(0);
 
   const effectiveOffline = !isOnline || isSimulatedOffline;
+  const prevEffectiveOffline = useRef<boolean>(effectiveOffline);
+  const syncTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const runSyncSequence = () => {
+    setIsVisible(true);
+    setSyncStatus('syncing');
+    setSyncProgress(0);
+
+    if (syncTimerRef.current) clearInterval(syncTimerRef.current);
+
+    let currentProgress = 0;
+    const interval = setInterval(() => {
+      currentProgress += Math.floor(Math.random() * 16) + 14;
+      if (currentProgress >= 100) {
+        currentProgress = 100;
+        setSyncProgress(100);
+        setSyncStatus('complete');
+        clearInterval(interval);
+
+        // After completion, close/disappear banner
+        setTimeout(() => {
+          setIsVisible(false);
+          setSyncStatus('idle');
+        }, 750);
+      } else {
+        setSyncProgress(currentProgress);
+      }
+    }, 65);
+
+    syncTimerRef.current = interval as unknown as NodeJS.Timeout;
+  };
+
+  // On mount: run initial sync if online, or show Offline immediately if offline
+  useEffect(() => {
+    if (effectiveOffline) {
+      setSyncStatus('idle');
+      setIsVisible(true);
+    } else {
+      runSyncSequence();
+    }
+    return () => {
+      if (syncTimerRef.current) clearInterval(syncTimerRef.current);
+    };
+  }, []);
+
+  // Monitor network / offline mode changes
+  useEffect(() => {
+    // If state changed from online -> offline
+    if (!prevEffectiveOffline.current && effectiveOffline) {
+      if (syncTimerRef.current) clearInterval(syncTimerRef.current);
+      setSyncStatus('idle');
+      setIsVisible(true);
+    }
+    // If state changed from offline -> online
+    else if (prevEffectiveOffline.current && !effectiveOffline) {
+      runSyncSequence();
+    }
+
+    prevEffectiveOffline.current = effectiveOffline;
+  }, [effectiveOffline]);
+
+  // Monitor manual triggers or parent isSyncing
+  useEffect(() => {
+    if (isSyncing && !effectiveOffline && syncStatus !== 'syncing') {
+      runSyncSequence();
+    }
+  }, [isSyncing, effectiveOffline]);
+
+  if (!isVisible) return null;
 
   return (
-    <div className="w-full bg-slate-900 text-slate-100 text-xs border-b border-slate-800 transition-all">
+    <div className="w-full bg-slate-900 text-slate-100 text-xs border-b border-slate-800 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
       <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-between flex-wrap gap-2">
         {/* Connection & Queue Info */}
-        <div className="flex items-center gap-2">
-          {effectiveOffline ? (
+        <div className="flex items-center gap-2.5">
+          {/* Active Syncing State with Circular Loader */}
+          {syncStatus === 'syncing' || syncStatus === 'complete' ? (
+            <div className="flex items-center gap-2 text-blue-400 font-medium">
+              {syncStatus === 'complete' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <CircularProgress progress={syncProgress} size={18} />
+              )}
+              <span>
+                {syncStatus === 'complete'
+                  ? 'Sync Complete • All systems ready'
+                  : `Syncing with BuyMesho server... ${syncProgress}%`}
+              </span>
+            </div>
+          ) : effectiveOffline ? (
             <div className="flex items-center gap-1.5 text-amber-400 font-medium">
               <WifiOff className="w-3.5 h-3.5" />
               <span>
                 {isSimulatedOffline && !isOnline
                   ? 'Offline (No Connection)'
                   : isSimulatedOffline
-                  ? 'Simulated Offline'
-                  : 'Device Offline'}
+                  ? 'Offline (Simulated)'
+                  : 'Offline'}
               </span>
             </div>
           ) : (
@@ -59,7 +184,7 @@ export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({
               {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
           ) : (
-            effectiveOffline && (
+            effectiveOffline && syncStatus === 'idle' && (
               <span className="text-[11px] text-slate-400 font-normal">
                 Scans will queue locally
               </span>
@@ -67,10 +192,10 @@ export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({
           )}
         </div>
 
-        {/* Actions Controls */}
+        {/* Actions Controls & Close Button */}
         <div className="flex items-center gap-2">
           {/* Manual Sync Now Button */}
-          {queuedItems.length > 0 && (
+          {queuedItems.length > 0 && syncStatus === 'idle' && (
             <button
               onClick={onSyncNow}
               disabled={isSyncing || (!isOnline && !isSimulatedOffline)}
@@ -93,6 +218,16 @@ export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({
           >
             <CloudOff className="w-3 h-3" />
             <span>{isSimulatedOffline ? 'Disable Test Offline' : 'Test Offline Mode'}</span>
+          </button>
+
+          {/* Dismiss/Close Banner Button */}
+          <button
+            onClick={() => setIsVisible(false)}
+            className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            title="Dismiss notification"
+            aria-label="Dismiss notification"
+          >
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

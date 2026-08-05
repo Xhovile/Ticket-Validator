@@ -3,12 +3,63 @@ import { Radio, Clock, AlertTriangle, ArrowLeft, Users, ScanLine } from 'lucide-
 import { EventItem, CheckInSession } from '../types';
 
 interface EventDetailViewProps {
-  event: EventItem;
+  event?: EventItem;
   onBack: () => void;
   onStartScanning: () => void;
   onViewAttendees: () => void;
   activeSession: CheckInSession | null;
+  isLoading?: boolean;
 }
+
+export const EventDetailSkeleton: React.FC = () => {
+  return (
+    <div className="space-y-4 pb-24 pt-2 px-4 max-w-md mx-auto animate-pulse">
+      {/* Back button header */}
+      <div className="flex items-center justify-between">
+        <div className="w-36 h-9 bg-slate-200 rounded-lg" />
+        <div className="w-20 h-6 bg-slate-200 rounded-md" />
+      </div>
+
+      {/* Main Event Card */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+        {/* Banner image skeleton */}
+        <div className="relative h-40 bg-slate-200 p-4 flex flex-col justify-end">
+          <div className="w-16 h-4 bg-slate-300 rounded mb-2" />
+          <div className="w-3/4 h-5 bg-slate-300 rounded mb-1.5" />
+          <div className="w-1/2 h-3.5 bg-slate-300 rounded" />
+        </div>
+
+        {/* Minimal Stats Section */}
+        <div className="p-4 space-y-3.5">
+          {/* Progress Bar skeleton */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between">
+              <div className="w-28 h-3.5 bg-slate-200 rounded" />
+              <div className="w-20 h-3.5 bg-slate-200 rounded" />
+            </div>
+            <div className="h-2 w-full bg-slate-200 rounded-full" />
+          </div>
+
+          {/* 3 Core Numbers */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-slate-100 p-3 rounded-lg h-14" />
+            <div className="bg-slate-100 p-3 rounded-lg h-14" />
+            <div className="bg-slate-100 p-3 rounded-lg h-14" />
+          </div>
+
+          {/* Gate info skeleton */}
+          <div className="h-12 bg-slate-100 rounded-lg" />
+
+          {/* Action Buttons */}
+          <div className="space-y-2 pt-1">
+            <div className="h-10 bg-slate-200 rounded-lg w-full" />
+            <div className="h-10 bg-slate-200 rounded-lg w-full" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const EventDetailView: React.FC<EventDetailViewProps> = ({
   event,
@@ -16,7 +67,12 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({
   onStartScanning,
   onViewAttendees,
   activeSession,
+  isLoading = false,
 }) => {
+  if (isLoading || !event) {
+    return <EventDetailSkeleton />;
+  }
+
   const remainingCount = Math.max(0, event.totalTicketsSold - event.checkedInCount);
   const checkInPercentage = event.totalTicketsSold > 0
     ? Math.round((event.checkedInCount / event.totalTicketsSold) * 100)

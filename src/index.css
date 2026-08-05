@@ -19,6 +19,48 @@
   }
 }
 
+/* Outdoor Sunlight High Contrast Mode */
+.sunlight-high-contrast {
+  filter: contrast(135%) saturate(120%);
+}
+
+.sunlight-high-contrast body {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+.sunlight-high-contrast p,
+.sunlight-high-contrast span,
+.sunlight-high-contrast h1,
+.sunlight-high-contrast h2,
+.sunlight-high-contrast h3,
+.sunlight-high-contrast h4,
+.sunlight-high-contrast h5,
+.sunlight-high-contrast h6,
+.sunlight-high-contrast button,
+.sunlight-high-contrast td,
+.sunlight-high-contrast th,
+.sunlight-high-contrast input {
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+}
+
+.sunlight-high-contrast .text-slate-400,
+.sunlight-high-contrast .text-slate-500,
+.sunlight-high-contrast .text-slate-600 {
+  color: #1e293b !important;
+}
+
+.sunlight-high-contrast .bg-slate-50,
+.sunlight-high-contrast .bg-slate-100 {
+  background-color: #e2e8f0 !important;
+}
+
+.sunlight-high-contrast .border-slate-100,
+.sunlight-high-contrast .border-slate-200 {
+  border-color: #64748b !important;
+}
+
 /* Custom subtle scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

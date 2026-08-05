@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScanLine, ShieldCheck, User as UserIcon, LogOut, Radio } from 'lucide-react';
+import { ScanLine, ShieldCheck, User as UserIcon, LogOut, Radio, Sun } from 'lucide-react';
 import { User, CheckInSession } from '../types';
 import { INITIAL_USERS } from '../data/mockData';
 
@@ -10,6 +10,8 @@ interface HeaderProps {
   activeSession: CheckInSession | null;
   activeEventName?: string;
   onOpenSessionModal?: () => void;
+  isHighContrast?: boolean;
+  onToggleHighContrast?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onSwitchUser,
   activeSession,
+  isHighContrast = false,
+  onToggleHighContrast,
 }) => {
   const [showUserDropdown, setShowUserDropdown] = React.useState(false);
 
@@ -53,7 +57,9 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2 p-1 pl-2.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 transition text-left focus:outline-none min-h-[36px]"
+                className={`flex items-center gap-2 p-1 pl-2.5 rounded-lg border transition text-left focus:outline-none min-h-[36px] ${
+                  isHighContrast ? 'bg-amber-50/90 border-amber-300 ring-1 ring-amber-400/40' : 'bg-white border-slate-200 hover:bg-slate-50'
+                }`}
               >
                 <div className="text-right hidden sm:block">
                   <div className="text-xs font-medium text-slate-900 leading-tight truncate max-w-[90px]">{user.name}</div>
@@ -73,13 +79,46 @@ export const Header: React.FC<HeaderProps> = ({
               {showUserDropdown && (
                 <>
                   <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-xs" onClick={() => setShowUserDropdown(false)} />
-                  <div className="absolute right-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-lg z-50 p-2 text-xs">
+                  <div className="absolute right-0 mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-lg z-50 p-2 text-xs">
                     <div className="p-2 border-b border-slate-100 mb-1">
                       <p className="font-semibold text-slate-900">{user.name}</p>
                       <p className="text-slate-500 text-[11px] truncate">{user.email}</p>
                       <div className="mt-1 flex items-center gap-1 text-slate-500 text-[10px] font-medium">
                         <ShieldCheck className="w-3 h-3 text-blue-600" />
                         <span>{user.assignedEventIds.length} Assigned Events</span>
+                      </div>
+                    </div>
+
+                    {/* Display & Sunlight Settings */}
+                    <div className="p-2 border-b border-slate-100 mb-1 bg-slate-50/80 rounded-lg">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`p-1.5 rounded-md ${isHighContrast ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'}`}>
+                            <Sun className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-900 text-[11px] leading-tight">Sunlight High Contrast</p>
+                            <p className="text-[10px] text-slate-500">Outdoor legibility boost</p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onToggleHighContrast) onToggleHighContrast();
+                          }}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            isHighContrast ? 'bg-amber-500' : 'bg-slate-300'
+                          }`}
+                          role="switch"
+                          aria-checked={isHighContrast}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                              isHighContrast ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
                       </div>
                     </div>
 

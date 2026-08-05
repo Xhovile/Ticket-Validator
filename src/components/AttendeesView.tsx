@@ -3,19 +3,72 @@ import { Search, Filter, Phone, CheckCircle2, AlertTriangle, XCircle, ChevronRig
 import { Ticket, TicketStatus, EventItem } from '../types';
 
 interface AttendeesViewProps {
-  event: EventItem;
-  tickets: Ticket[];
+  event?: EventItem;
+  tickets?: Ticket[];
   onSelectTicket: (ticket: Ticket) => void;
   onUpdateStatusDirect: (ticketId: string, status: TicketStatus) => void;
+  isLoading?: boolean;
 }
+
+export const AttendeesSkeleton: React.FC = () => {
+  return (
+    <div className="space-y-4 pb-24 pt-2 px-4 max-w-md mx-auto animate-pulse">
+      {/* Header Skeleton */}
+      <div className="space-y-1">
+        <div className="w-36 h-6 bg-slate-200 rounded-md" />
+        <div className="w-52 h-4 bg-slate-200 rounded-md" />
+      </div>
+
+      {/* Search Input Skeleton */}
+      <div className="w-full h-10 bg-slate-200 rounded-xl" />
+
+      {/* Filter Chips Skeleton */}
+      <div className="flex items-center gap-1.5 overflow-hidden">
+        <div className="w-16 h-8 bg-slate-200 rounded-lg shrink-0" />
+        <div className="w-24 h-8 bg-slate-200 rounded-lg shrink-0" />
+        <div className="w-20 h-8 bg-slate-200 rounded-lg shrink-0" />
+        <div className="w-20 h-8 bg-slate-200 rounded-lg shrink-0" />
+      </div>
+
+      {/* Attendee Roster Cards Skeletons */}
+      <div className="space-y-2">
+        <div className="w-32 h-3.5 bg-slate-200 rounded" />
+
+        {/* Card skeletons */}
+        {[1, 2, 3, 4, 5].map((idx) => (
+          <div key={idx} className="p-3.5 rounded-xl bg-white border border-slate-200 space-y-2.5">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-28 h-4 bg-slate-200 rounded" />
+                  <div className="w-12 h-3.5 bg-slate-100 rounded" />
+                </div>
+                <div className="w-36 h-3 bg-slate-200 rounded" />
+              </div>
+              <div className="w-16 h-5 bg-slate-200 rounded" />
+            </div>
+            <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
+              <div className="w-24 h-3 bg-slate-200 rounded" />
+              <div className="w-14 h-3 bg-slate-200 rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const RECENT_SEARCHES_KEY = 'buymesho_recent_searches';
 
 export const AttendeesView: React.FC<AttendeesViewProps> = ({
   event,
-  tickets,
+  tickets = [],
   onSelectTicket,
+  isLoading = false,
 }) => {
+  if (isLoading || !event) {
+    return <AttendeesSkeleton />;
+  }
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [selectedCategory] = useState<string>('All');

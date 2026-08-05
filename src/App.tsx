@@ -52,6 +52,21 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('events');
   const [viewState, setViewState] = useState<'list' | 'detail'>('list');
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [isAttendeesLoading, setIsAttendeesLoading] = useState(false);
+  const [isHighContrast, setIsHighContrast] = useState<boolean>(() => {
+    return localStorage.getItem('buymesho_high_contrast') === 'true';
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('sunlight-high-contrast', isHighContrast);
+    localStorage.setItem('buymesho_high_contrast', String(isHighContrast));
+  }, [isHighContrast]);
+
+  const toggleHighContrast = () => {
+    setIsHighContrast((prev) => !prev);
+    soundFX.playClick();
+  };
 
   // Modals & Active Overlays
   const [showSessionModal, setShowSessionModal] = useState(false);
@@ -205,6 +220,8 @@ export default function App() {
     setPermissionError(null);
     setSelectedEvent(event);
     setViewState('detail');
+    setIsDetailLoading(true);
+    setTimeout(() => setIsDetailLoading(false), 300);
     soundFX.playClick();
   };
 
@@ -461,6 +478,8 @@ export default function App() {
           onLogout={handleLogout}
           onSwitchUser={handleSwitchUser}
           activeSession={null}
+          isHighContrast={isHighContrast}
+          onToggleHighContrast={toggleHighContrast}
         />
         <main>
           <LoginView onLogin={handleLogin} />
@@ -478,6 +497,8 @@ export default function App() {
         onSwitchUser={handleSwitchUser}
         activeSession={activeSession}
         activeEventName={selectedEvent?.name}
+        isHighContrast={isHighContrast}
+        onToggleHighContrast={toggleHighContrast}
       />
 
       {/* Offline & Background Sync Banner */}
@@ -518,6 +539,7 @@ export default function App() {
             ) : (
               <EventDetailView
                 event={selectedEvent}
+                isLoading={isDetailLoading}
                 onBack={() => setViewState('list')}
                 onStartScanning={() => {
                   if (activeSession && activeSession.active && activeSession.eventId === selectedEvent.id) {
@@ -526,7 +548,11 @@ export default function App() {
                     setShowSessionModal(true);
                   }
                 }}
-                onViewAttendees={() => setCurrentTab('attendees')}
+                onViewAttendees={() => {
+                  setCurrentTab('attendees');
+                  setIsAttendeesLoading(true);
+                  setTimeout(() => setIsAttendeesLoading(false), 300);
+                }}
                 activeSession={activeSession}
               />
             )}
@@ -548,6 +574,7 @@ export default function App() {
           <AttendeesView
             event={selectedEvent}
             tickets={tickets}
+            isLoading={isAttendeesLoading}
             onSelectTicket={(ticket) => setSelectedTicketForDetail(ticket)}
             onUpdateStatusDirect={(ticketId, status) => {
               updateTicketStatus(ticketId, status);
@@ -599,6 +626,10 @@ export default function App() {
       <FooterNavigation
         currentTab={currentTab}
         onTabChange={(tab) => {
+          if (tab === 'attendees' && currentTab !== 'attendees') {
+            setIsAttendeesLoading(true);
+            setTimeout(() => setIsAttendeesLoading(false), 300);
+          }
           setCurrentTab(tab);
           setPermissionError(null);
         }}
