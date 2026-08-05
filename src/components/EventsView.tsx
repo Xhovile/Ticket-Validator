@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Radio, Clock, AlertCircle, ChevronRight, Sparkles, Filter } from 'lucide-react';
+import { Search, Radio, Clock, AlertCircle, Filter } from 'lucide-react';
 import { EventItem, User } from '../types';
 
 interface EventsViewProps {
@@ -20,7 +20,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
   onClearPermissionError,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'Live' | 'Upcoming' | 'Ended'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'Live' | 'Upcoming'>('all');
 
   // Filter events based on logged in user's assignedEventIds or if organizer owns it.
   const authorizedEvents = events.filter((evt) => {
@@ -29,9 +29,6 @@ export const EventsView: React.FC<EventsViewProps> = ({
     }
     return user.assignedEventIds.includes(evt.id);
   });
-
-  // Recent events (first 2 authorized events)
-  const recentEvents = authorizedEvents.slice(0, 2);
 
   // Filtered list strictly from authorized creator events
   const filteredEvents = authorizedEvents.filter((evt) => {
@@ -101,56 +98,6 @@ export const EventsView: React.FC<EventsViewProps> = ({
         </div>
       )}
 
-      {/* Recent Events Section */}
-      {recentEvents.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              Recent Accessible Events
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-2">
-            {recentEvents.map((evt) => {
-              const isSelected = selectedEvent?.id === evt.id;
-
-              return (
-                <button
-                  key={`recent-${evt.id}`}
-                  onClick={() => onSelectEvent(evt)}
-                  className={`w-full p-3 rounded-xl border text-left transition min-h-[56px] flex items-center justify-between ${
-                    isSelected
-                      ? 'bg-slate-50 border-blue-600'
-                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={evt.bannerImage}
-                      alt={evt.name}
-                      className="w-11 h-11 rounded-lg object-cover border border-slate-200 shrink-0"
-                    />
-                    <div>
-                      <h4 className="text-xs font-semibold text-slate-900 leading-tight line-clamp-1">{evt.name}</h4>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{evt.date} • {evt.venue}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[11px] font-medium text-emerald-700">
-                          {evt.checkedInCount} / {evt.totalTicketsSold} checked in
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(evt.state)}
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Search & Filter Controls */}
       <div className="space-y-2">
         <div className="relative">
@@ -167,7 +114,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
         {/* Status Filter Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
           <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
-          {(['all', 'Live', 'Upcoming', 'Ended'] as const).map((st) => (
+          {(['all', 'Live', 'Upcoming'] as const).map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}

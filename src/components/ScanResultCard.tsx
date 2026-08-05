@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, AlertTriangle, XCircle, ShieldAlert, X, ChevronDown, Check, AlertCircle, Clock } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, ShieldAlert, X, ChevronDown, Check, AlertCircle, Clock, Zap } from 'lucide-react';
 import { Ticket, TicketStatus } from '../types';
 
 interface ScanResultCardProps {
@@ -7,6 +7,7 @@ interface ScanResultCardProps {
   scanTime: string;
   isDuplicateScan?: boolean;
   isOfflineQueued?: boolean;
+  isContinuousMode?: boolean;
   onUpdateStatus: (newStatus: TicketStatus, notes?: string) => void;
   onDismiss: () => void;
 }
@@ -16,6 +17,7 @@ export const ScanResultCard: React.FC<ScanResultCardProps> = ({
   scanTime,
   isDuplicateScan = false,
   isOfflineQueued = false,
+  isContinuousMode = false,
   onUpdateStatus,
   onDismiss,
 }) => {
@@ -77,6 +79,19 @@ export const ScanResultCard: React.FC<ScanResultCardProps> = ({
         className={`w-full max-w-md bg-white border rounded-xl shadow-xl p-4 space-y-3 relative overflow-hidden ${variant.cardBg}`}
         onClick={(e) => e.stopPropagation()}
       >
+
+        {/* Continuous Scan Active Indicator Banner */}
+        {isContinuousMode && (
+          <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-900 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+            <div className="flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+              <span>Continuous Mode • Auto-advancing for next scan</span>
+            </div>
+            <span className="text-[9px] font-mono font-bold bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded uppercase tracking-wider">
+              AUTO-SCAN
+            </span>
+          </div>
+        )}
 
         {/* Status Banner */}
         <div className={`p-2.5 rounded-lg border flex items-center justify-between ${variant.bannerBg}`}>

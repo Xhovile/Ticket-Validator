@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { User, EventItem, Ticket, TicketStatus, ActivityLogEntry, CheckInSession } from './types';
 import {
@@ -70,12 +70,24 @@ export default function App() {
 
   // Modals & Active Overlays
   const [showSessionModal, setShowSessionModal] = useState(false);
+  const [isContinuousScan, setIsContinuousScan] = useState<boolean>(true);
+  const autoDismissTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastScanThrottleRef = useRef<{ code: string; time: number }>({ code: '', time: 0 });
+
   const [activeScanResult, setActiveScanResult] = useState<{
     ticket: Ticket;
     scanTime: string;
     isDuplicate: boolean;
     isOfflineQueued?: boolean;
   } | null>(null);
+
+  const handleDismissResult = () => {
+    if (autoDismissTimerRef.current) {
+      clearTimeout(autoDismissTimerRef.current);
+      autoDismissTimerRef.current = null;
+    }
+    setActiveScanResult(null);
+  };
   const [selectedTicketForDetail, setSelectedTicketForDetail] = useState<Ticket | null>(null);
 
   // Offline & Background Sync state
@@ -251,9 +263,37 @@ export default function App() {
   const handleScanTicket = (scannedCode: string) => {
     if (!selectedEvent || !currentUser || !activeSession) return;
 
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const now = Date.now();
     const cleanCode = scannedCode.trim().toLowerCase();
     const effectiveOffline = !isOnline || isSimulatedOffline;
+
+    // Throttle identical code scans within 1.5s when in continuous scan mode
+    if (
+      isContinuousScan &&
+      lastScanThrottleRef.current.code === cleanCode &&
+      now - lastScanThrottleRef.current.time < 1500
+    ) {
+      return;
+    }
+    lastScanThrottleRef.current = { code: cleanCode, time: now };
+
+    // Clear any previous auto-dismiss timer
+    if (autoDismissTimerRef.current) {
+      clearTimeout(autoDismissTimerRef.current);
+      autoDismissTimerRef.current = null;
+    }
+
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    // Schedule helper for continuous mode auto dismissal
+    const scheduleAutoDismiss = (delayMs: number = 1800) => {
+      if (isContinuousScan) {
+        autoDismissTimerRef.current = setTimeout(() => {
+          setActiveScanResult(null);
+          autoDismissTimerRef.current = null;
+        }, delayMs);
+      }
+    };
 
     // Find ticket by QR payload or Ticket ID
     const foundTicket = tickets.find(
@@ -297,6 +337,7 @@ export default function App() {
         scanTime: timestamp,
         isDuplicate: false,
       });
+      scheduleAutoDismiss(2500);
       return;
     }
 
@@ -326,6 +367,7 @@ export default function App() {
         scanTime: timestamp,
         isDuplicate: true,
       });
+      scheduleAutoDismiss(2200);
     } else if (foundTicket.status === 'Cancelled' || foundTicket.status === 'Refunded' || foundTicket.status === 'Blocked') {
       // Invalid status scan
       soundFX.playError();
@@ -348,6 +390,7 @@ export default function App() {
         scanTime: timestamp,
         isDuplicate: false,
       });
+      scheduleAutoDismiss(2500);
     } else {
       // Valid entry! Auto-check inside
       soundFX.playSuccess();
@@ -367,6 +410,7 @@ export default function App() {
         isDuplicate: false,
         isOfflineQueued: effectiveOffline,
       });
+      scheduleAutoDismiss(1800);
     }
   };
 
@@ -567,6 +611,8 @@ export default function App() {
             onScanTicket={handleScanTicket}
             onBackToEvent={() => setCurrentTab('events')}
             onStartSessionRequest={() => setShowSessionModal(true)}
+            isContinuousScan={isContinuousScan}
+            onToggleContinuousScan={() => setIsContinuousScan((prev) => !prev)}
           />
         )}
 
@@ -591,12 +637,13 @@ export default function App() {
           scanTime={activeScanResult.scanTime}
           isDuplicateScan={activeScanResult.isDuplicate}
           isOfflineQueued={activeScanResult.isOfflineQueued}
+          isContinuousMode={isContinuousScan}
           onUpdateStatus={(newStatus) => {
             updateTicketStatus(activeScanResult.ticket.id, newStatus);
-            setActiveScanResult(null);
+            handleDismissResult();
             soundFX.playClick();
           }}
-          onDismiss={() => setActiveScanResult(null)}
+          onDismiss={handleDismissResult}
         />
       )}
 

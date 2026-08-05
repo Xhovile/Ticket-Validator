@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, ScanLine, Search, ArrowLeft, ZoomIn, ZoomOut, ChevronDown, ChevronUp } from 'lucide-react';
+import { Camera, ScanLine, Search, ArrowLeft, ZoomIn, ZoomOut, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { EventItem, CheckInSession, Ticket } from '../types';
 import { soundFX } from '../utils/audio';
 
@@ -11,6 +11,8 @@ interface ScannerViewProps {
   onScanTicket: (scannedCode: string) => void;
   onBackToEvent: () => void;
   onStartSessionRequest: () => void;
+  isContinuousScan?: boolean;
+  onToggleContinuousScan?: () => void;
 }
 
 export const ScannerView: React.FC<ScannerViewProps> = ({
@@ -20,6 +22,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   onScanTicket,
   onBackToEvent,
   onStartSessionRequest,
+  isContinuousScan = false,
+  onToggleContinuousScan,
 }) => {
   const [cameraActive, setCameraActive] = useState(false);
   const [manualCode, setManualCode] = useState('');
@@ -174,7 +178,49 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       </div>
 
       {/* Main Scanner View - Outdoor High Contrast Design */}
-      <div className="my-auto py-3 space-y-4">
+      <div className="my-auto py-3 space-y-3">
+        {/* Continuous Scan Mode Toggle Control */}
+        <div className="max-w-[300px] mx-auto flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <div className={`p-1.5 rounded-lg transition-colors ${isContinuousScan ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+              <Zap className={`w-4 h-4 ${isContinuousScan ? 'animate-pulse text-emerald-600' : ''}`} />
+            </div>
+            <div className="text-left">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-900 leading-tight">Continuous Scan</span>
+                {isContinuousScan && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase tracking-wider">
+                    Active
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-500 font-medium">
+                {isContinuousScan ? 'Auto-clears modal for rapid entry' : 'Requires manual tap to dismiss'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onToggleContinuousScan) onToggleContinuousScan();
+              soundFX.playClick();
+            }}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none min-h-[32px] items-center ${
+              isContinuousScan ? 'bg-emerald-600' : 'bg-slate-300'
+            }`}
+            role="switch"
+            aria-checked={isContinuousScan}
+            title="Toggle continuous scan mode"
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                isContinuousScan ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
         <div className="relative w-full aspect-square max-w-[300px] mx-auto rounded-2xl overflow-hidden bg-slate-900 border border-slate-800">
           
           {/* HTML5 QR Code Container */}
