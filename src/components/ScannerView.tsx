@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, ScanLine, Search, ArrowLeft } from 'lucide-react';
+import { Camera, ScanLine, Search, ArrowLeft, ZoomIn, ZoomOut, ChevronDown, ChevronUp } from 'lucide-react';
 import { EventItem, CheckInSession, Ticket } from '../types';
+import { soundFX } from '../utils/audio';
 
 interface ScannerViewProps {
   event: EventItem;
@@ -22,11 +23,40 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 }) => {
   const [cameraActive, setCameraActive] = useState(false);
   const [manualCode, setManualCode] = useState('');
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [isZoomOpen, setIsZoomOpen] = useState<boolean>(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const regionId = 'html5qr-code-full-region';
 
   // Fast test scan triggers for demo evaluate
   const sampleTickets = tickets.slice(0, 6);
+
+  // Apply zoom to hardware camera track if available, as well as CSS scale transform fallback
+  const applyZoom = (level: number) => {
+    setZoomLevel(level);
+
+    // 1. Try Hardware Camera Track Zoom API
+    if (scannerRef.current && (scannerRef.current as any).getRunningTrackCapabilities) {
+      try {
+        const capabilities = (scannerRef.current as any).getRunningTrackCapabilities();
+        if (capabilities && capabilities.zoom) {
+          (scannerRef.current as any).applyVideoConstraints({
+            advanced: [{ zoom: level }]
+          });
+        }
+      } catch (err) {
+        // Fall back to CSS transform
+      }
+    }
+
+    // 2. CSS Magnification Fallback on Video Element
+    const videoElem = document.querySelector(`#${regionId} video`) as HTMLVideoElement | null;
+    if (videoElem) {
+      videoElem.style.transform = `scale(${level})`;
+      videoElem.style.transformOrigin = 'center center';
+      videoElem.style.transition = 'transform 0.15s ease-out';
+    }
+  };
 
   useEffect(() => {
     let html5QrCode: Html5Qrcode | null = null;
@@ -52,6 +82,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           )
           .then(() => {
             setCameraActive(true);
+            // Re-apply current zoom setting after camera starts
+            setTimeout(() => applyZoom(zoomLevel), 300);
           })
           .catch((err) => {
             console.log('Camera start fallback:', err);
@@ -150,10 +182,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
           {/* Scanner Reticle Overlay */}
           <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-5">
-            {/* Top Bar Label */}
-            <div className="px-3 py-0.5 rounded-full bg-slate-900/80 backdrop-blur-sm border border-slate-700 text-[10px] font-medium text-slate-200 flex items-center gap-1.5">
-              <span>Ready to Scan</span>
-            </div>
+            {/* Top spacer */}
+            <div className="h-2" />
 
             {/* Target Box Corners */}
             <div className="w-44 h-44 relative flex items-center justify-center">
@@ -166,10 +196,30 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
               <div className="w-full h-0.5 bg-blue-500/80 animate-pulse" />
             </div>
 
-            {/* Bottom Camera Hint */}
-            <p className="text-[10px] text-slate-300 font-medium bg-slate-900/80 px-2.5 py-0.5 rounded-full backdrop-blur-sm">
-              Align QR code within reticle
-            </p>
+            {/* Bottom Right Accordion ZOOM Button */}
+            <div className="w-full flex items-center justify-end pointer-events-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsZoomOpen(!isZoomOpen);
+                  soundFX.playClick();
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-md shadow-md transition-all ${
+                  isZoomOpen
+                    ? 'bg-blue-600 text-white border border-blue-400 ring-2 ring-blue-500/30'
+                    : 'bg-slate-900/90 text-slate-100 border border-slate-700 hover:bg-slate-800 hover:border-slate-500'
+                }`}
+                aria-expanded={isZoomOpen}
+                title="Toggle camera zoom controls"
+              >
+                <ZoomIn className="w-3.5 h-3.5 text-blue-300" />
+                <span className="tracking-wide">ZOOM</span>
+                <span className="text-[10px] font-mono bg-black/40 px-1 py-0.2 rounded font-semibold text-blue-200">
+                  {zoomLevel.toFixed(1)}x
+                </span>
+                {isZoomOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
 
           {!cameraActive && (
@@ -182,6 +232,93 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             </div>
           )}
         </div>
+
+        {/* Camera Optical / Digital Zoom Slider Accordion Card */}
+        {isZoomOpen && (
+          <div className="max-w-[300px] mx-auto bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-800">
+              <div className="flex items-center gap-1.5 text-slate-700">
+                <ZoomIn className="w-3.5 h-3.5 text-blue-600" />
+                <span className="text-[11px] font-semibold">Camera Zoom</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                  {zoomLevel.toFixed(1)}x
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsZoomOpen(false)}
+                  className="p-0.5 text-slate-400 hover:text-slate-600"
+                  title="Close Zoom"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const nextLevel = Math.max(1, Math.round((zoomLevel - 0.2) * 10) / 10);
+                  applyZoom(nextLevel);
+                  soundFX.playClick();
+                }}
+                className="p-1 rounded hover:bg-slate-100 text-slate-600 transition min-h-[32px] min-w-[32px] flex items-center justify-center disabled:opacity-40"
+                title="Zoom out"
+                disabled={zoomLevel <= 1}
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+
+              <input
+                type="range"
+                min="1"
+                max="3.5"
+                step="0.1"
+                value={zoomLevel}
+                onChange={(e) => applyZoom(parseFloat(e.target.value))}
+                className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                aria-label="Camera zoom slider"
+              />
+
+              <button
+                type="button"
+                onClick={() => {
+                  const nextLevel = Math.min(3.5, Math.round((zoomLevel + 0.2) * 10) / 10);
+                  applyZoom(nextLevel);
+                  soundFX.playClick();
+                }}
+                className="p-1 rounded hover:bg-slate-100 text-slate-600 transition min-h-[32px] min-w-[32px] flex items-center justify-center disabled:opacity-40"
+                title="Zoom in"
+                disabled={zoomLevel >= 3.5}
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Quick Preset Zoom Chips */}
+            <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-100">
+              {[1, 1.5, 2, 2.5, 3].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    applyZoom(preset);
+                    soundFX.playClick();
+                  }}
+                  className={`flex-1 py-1 text-[10px] font-mono font-bold rounded transition border ${
+                    zoomLevel === preset
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {preset}x
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Manual Code Entry */}
         <form onSubmit={handleManualSubmit} className="max-w-[300px] mx-auto flex items-center gap-2">

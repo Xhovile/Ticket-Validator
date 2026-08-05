@@ -1,7 +1,8 @@
 import React from 'react';
-import { ScanLine, ShieldCheck, User as UserIcon, LogOut, Radio, Sun } from 'lucide-react';
+import { ScanLine, ShieldCheck, User as UserIcon, LogOut, Radio, Sun, Smartphone } from 'lucide-react';
 import { User, CheckInSession } from '../types';
 import { INITIAL_USERS } from '../data/mockData';
+import { soundFX } from '../utils/audio';
 
 interface HeaderProps {
   user: User | null;
@@ -89,8 +90,8 @@ export const Header: React.FC<HeaderProps> = ({
                       </div>
                     </div>
 
-                    {/* Display & Sunlight Settings */}
-                    <div className="p-2 border-b border-slate-100 mb-1 bg-slate-50/80 rounded-lg">
+                    {/* Display & Sunlight & Haptic Settings */}
+                    <div className="p-2 border-b border-slate-100 mb-1 bg-slate-50/80 rounded-lg space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <div className={`p-1.5 rounded-md ${isHighContrast ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'}`}>
@@ -118,6 +119,27 @@ export const Header: React.FC<HeaderProps> = ({
                               isHighContrast ? 'translate-x-4' : 'translate-x-0'
                             }`}
                           />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-md bg-blue-100 text-blue-700">
+                            <Smartphone className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-900 text-[11px] leading-tight">Haptic Feedback</p>
+                            <p className="text-[10px] text-slate-500">Concert gate vibration</p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => soundFX.playSuccess()}
+                          className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-semibold shadow-xs transition"
+                          title="Test vibration on your mobile device"
+                        >
+                          Test Haptic
                         </button>
                       </div>
                     </div>

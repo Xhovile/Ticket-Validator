@@ -15,20 +15,21 @@ class SoundFX {
     }
   }
 
-  // Trigger hardware vibration if available (200-300ms)
-  private triggerVibration(pattern: number | number[]) {
-    if (typeof window !== 'undefined' && 'navigator' in window && 'vibrate' in navigator) {
+  // Trigger hardware vibration if available (Optimized for mobile browsers)
+  public triggerVibration(pattern: number | number[]) {
+    if (typeof window !== 'undefined' && 'navigator' in window && typeof navigator.vibrate === 'function') {
       try {
         navigator.vibrate(pattern);
       } catch {
-        // Fallback if browser blocks vibration API
+        // Fallback if browser restricts API
       }
     }
   }
 
-  // Crisp high dual chime for valid check-in (🟢 Valid / Inside)
+  // Crisp high dual chime + strong single haptic confirmation for valid check-in (🟢 Valid / Inside)
   playSuccess() {
-    this.triggerVibration(200);
+    // 220ms sharp haptic pulse for instant physical confirmation in loud venues
+    this.triggerVibration([100, 40, 150]);
     try {
       this.initCtx();
       if (!this.ctx) return;
@@ -63,9 +64,10 @@ class SoundFX {
     }
   }
 
-  // Double warning buzz for duplicate scan attempt (🟡 Already Inside / Warning)
+  // Double warning buzz + rapid triple haptic pulse for duplicate scan attempt (🟡 Already Inside / Warning)
   playWarning() {
-    this.triggerVibration([100, 50, 100]);
+    // Rapid triple haptic sequence (100ms, 50ms pause, 100ms, 50ms pause, 100ms)
+    this.triggerVibration([100, 50, 100, 50, 100]);
     try {
       this.initCtx();
       if (!this.ctx) return;
@@ -91,9 +93,10 @@ class SoundFX {
     }
   }
 
-  // Heavy double low buzz for blocked / cancelled / invalid ticket scan (🔴 Invalid)
+  // Heavy double low buzz + distinct heavy haptic vibration pattern for blocked / cancelled / invalid ticket (🔴 Invalid)
   playError() {
-    this.triggerVibration([150, 75, 150]);
+    // Heavy long double thud vibration (280ms, 100ms pause, 280ms) for high contrast physically in noisy crowds
+    this.triggerVibration([280, 100, 280]);
     try {
       this.initCtx();
       if (!this.ctx) return;
@@ -119,8 +122,9 @@ class SoundFX {
     }
   }
 
-  // Subtle tap click for UI navigation
+  // Subtle tap click + light 20ms haptic for UI navigation
   playClick() {
+    this.triggerVibration(20);
     try {
       this.initCtx();
       if (!this.ctx) return;
@@ -146,3 +150,4 @@ class SoundFX {
 }
 
 export const soundFX = new SoundFX();
+
