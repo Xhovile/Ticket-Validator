@@ -1,50 +1,90 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ExternalLink, LogIn, ScanLine, ShieldCheck, UserPlus } from 'lucide-react';
 import App from '../App';
-import { User, UserRole } from '../types';
+import { User, UserRole, EventItem, Ticket } from '../types';
 
 const VALIDATOR_USER_KEY = 'buymesho_validator_user';
 const VALIDATOR_SESSION_KEY = 'buymesho_validator_session';
-const AUTH_USER_KEY = 'buymesho_identity_user';
-const AUTH_SESSION_KEY = 'buymesho_identity_session';
+const VALIDATOR_EVENTS_KEY = 'buymesho_validator_events';
+const VALIDATOR_TICKETS_KEY = 'buymesho_validator_tickets';
+const VALIDATOR_SYNC_META_KEY = 'buymesho_validator_sync_meta';
 const API_BASE_URL = import.meta.env.VITE_BUYMESHO_API_BASE_URL?.trim() || 'https://buymesho.vercel.app';
 
-declare global {
-  interface Window {
-    __buymeshoStoragePatched?: boolean;
-  }
-}
-
 type ValidatorIdentity = {
-  uid?: string;
-  email?: string | null;
+  uid: string;
+  email: string | null;
   email_verified?: boolean;
   is_admin?: boolean;
   display_name?: string | null;
-  name?: string | null;
 };
 
 type ValidatorAccessScope = {
   can_validate_tickets?: boolean;
-  can_manage_events?: boolean;
-  assigned_event_ids?: unknown;
-  event_ids?: unknown;
-  assignedGate?: string | null;
-  gate_name?: string | null;
+  is_admin?: boolean;
+  role?: 'admin' | 'validator';
+  source?: 'buymesho';
+  allowed_event_ids?: string[];
+  snapshot_version?: string | null;
+};
+
+type ValidatorEvent = {
+  id: string;
+  creator_uid: string | null;
+  event_type: string;
+  event_title: string;
+  organizer_name: string;
+  event_date: string;
+  start_time: string;
+  venue: string;
+  location: string;
+  ticket_mode: string;
+  ticket_price: number | null;
+  ticket_link: string | null;
+  description: string;
+  contact_whatsapp: string | null;
+  poster_alt: string | null;
+  spec_values: Record<string, unknown>;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  version: string;
+  ticket_count: number;
+};
+
+type ValidatorTicket = {
+  id: string;
+  code: string;
+  event_id: string;
+  event_title: string;
+  order_id: string;
+  buyer_id: string;
+  status: string;
+  order_status: string;
+  payment_status: string | null;
+  updated_at: string;
+  version: string;
+  metadata: Record<string, unknown>;
 };
 
 type ValidatorMeResponse = {
   success?: boolean;
   identity?: ValidatorIdentity;
-  validator_identity?: ValidatorIdentity;
-  user?: ValidatorIdentity;
+  creator?: Record<string, unknown> | null;
   access_scope?: ValidatorAccessScope;
-  scope?: ValidatorAccessScope;
-  session_token?: string | null;
+  events?: ValidatorEvent[];
 };
 
-function isValidRole(role: unknown): role is UserRole {
-  return role === 'organizer' || role === 'gate_staff';
+type ValidatorEventTicketsResponse = {
+  success?: boolean;
+  event?: ValidatorEvent;
+  tickets?: ValidatorTicket[];
+  snapshot_version?: string | null;
+};
+
+declare global {
+  interface Window {
+    __buymeshoValidatorRefresh?: (() => Promise<void>) | null;
+  }
 }
 
 function normalizeUser(raw: unknown): User | null {
@@ -54,8 +94,7 @@ function normalizeUser(raw: unknown): User | null {
   if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string' || typeof candidate.email !== 'string') {
     return null;
   }
-
-  if (!isValidRole(candidate.role)) return null;
+  if (candidate.role !== 'organizer' && candidate.role !== 'gate_staff') return null;
 
   return {
     id: candidate.id,
@@ -67,6 +106,21 @@ function normalizeUser(raw: unknown): User | null {
       ? candidate.assignedEventIds.filter((value): value is string => typeof value === 'string')
       : [],
     assignedGate: typeof candidate.assignedGate === 'string' ? candidate.assignedGate : undefined,
+  };
+}
+
+function toValidatorUser(identity: ValidatorIdentity, scope: ValidatorAccessScope, events: ValidatorEvent[]): User {
+  const email = identity.email ?? '';
+  const displayName = identity.display_name ?? email.split('@')[0] ?? 'Verified Staff';
+  const role: UserRole = scope.is_admin ? 'organizer' : 'gate_staff';
+
+  return {
+    id: identity.uid,
+    name: displayName,
+    email,
+    role,
+    assignedEventIds: scope.allowed_event_ids ?? events.map((event) => event.id),
+    assignedGate: scope.role ?? 'gate_staff',
   };
 }
 
@@ -106,123 +160,132 @@ function readCallbackToken(): string | null {
 
 function readStoredAuthUser(): User | null {
   try {
-    const rawUser = localStorage.getItem(AUTH_USER_KEY) ?? localStorage.getItem(VALIDATOR_USER_KEY);
-    const rawSession = localStorage.getItem(AUTH_SESSION_KEY) ?? localStorage.getItem(VALIDATOR_SESSION_KEY);
-    if (!rawUser || !rawSession) return null;
-    return normalizeUser(JSON.parse(rawUser));
+    const raw = localStorage.getItem(VALIDATOR_USER_KEY);
+    if (!raw) return null;
+    return normalizeUser(JSON.parse(raw));
   } catch {
     return null;
   }
 }
 
-function clearAuthenticatedUser() {
-  localStorage.removeItem(AUTH_USER_KEY);
-  localStorage.removeItem(AUTH_SESSION_KEY);
+function saveVerifiedSession(user: User, sessionToken: string) {
+  localStorage.setItem(VALIDATOR_USER_KEY, JSON.stringify(user));
+  localStorage.setItem(VALIDATOR_SESSION_KEY, sessionToken);
+}
+
+function clearVerifiedSession() {
   localStorage.removeItem(VALIDATOR_USER_KEY);
   localStorage.removeItem(VALIDATOR_SESSION_KEY);
-  window.dispatchEvent(new Event('buymesho-auth-change'));
 }
 
-function persistVerifiedSession(user: User, sessionToken: string) {
-  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
-  localStorage.setItem(VALIDATOR_USER_KEY, JSON.stringify(user));
-  localStorage.setItem(AUTH_SESSION_KEY, sessionToken);
-  localStorage.setItem(VALIDATOR_SESSION_KEY, sessionToken);
-  window.dispatchEvent(new Event('buymesho-auth-change'));
-}
-
-function patchStorageBridge() {
-  if (window.__buymeshoStoragePatched) return;
-
-  const storageProto = Storage.prototype as Storage & {
-    setItem: Storage['setItem'];
-    removeItem: Storage['removeItem'];
-  };
-
-  const originalSetItem = storageProto.setItem;
-  const originalRemoveItem = storageProto.removeItem;
-
-  storageProto.setItem = function setItem(this: Storage, key: string, value: string) {
-    originalSetItem.call(this, key, value);
-    if ([AUTH_USER_KEY, AUTH_SESSION_KEY, VALIDATOR_USER_KEY, VALIDATOR_SESSION_KEY].includes(key)) {
-      window.dispatchEvent(new Event('buymesho-auth-change'));
-    }
-  };
-
-  storageProto.removeItem = function removeItem(this: Storage, key: string) {
-    originalRemoveItem.call(this, key);
-
-    if (key === VALIDATOR_SESSION_KEY) {
-      originalRemoveItem.call(this, AUTH_USER_KEY);
-      originalRemoveItem.call(this, AUTH_SESSION_KEY);
-      originalRemoveItem.call(this, VALIDATOR_USER_KEY);
-      window.dispatchEvent(new Event('buymesho-auth-change'));
-      return;
-    }
-
-    if ([AUTH_USER_KEY, AUTH_SESSION_KEY, VALIDATOR_USER_KEY].includes(key)) {
-      window.dispatchEvent(new Event('buymesho-auth-change'));
-    }
-  };
-
-  window.__buymeshoStoragePatched = true;
-}
-
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
-}
-
-function toValidatorUser(identity: ValidatorIdentity, scope: ValidatorAccessScope): User {
-  const email = typeof identity.email === 'string' ? identity.email : '';
-  const baseName = identity.display_name ?? identity.name ?? email.split('@')[0] ?? 'Verified Staff';
-  const role: UserRole = identity.is_admin === true || scope.can_manage_events === true ? 'organizer' : 'gate_staff';
+function toEventItem(event: ValidatorEvent, creatorUid: string | null): EventItem {
+  const state = event.status === 'draft' ? 'Upcoming' : event.status === 'published' ? 'Live' : 'Ended';
 
   return {
-    id: identity.uid ?? email ?? 'buymesho-validator',
-    name: baseName,
-    email,
-    role,
-    assignedEventIds: stringArray(scope.assigned_event_ids ?? scope.event_ids),
-    assignedGate: scope.assignedGate ?? scope.gate_name ?? undefined,
+    id: event.id,
+    name: event.event_title,
+    organizerId: creatorUid ?? event.creator_uid ?? 'buymesho-creator',
+    organizerName: event.organizer_name,
+    date: `${event.event_date} ${event.start_time}`.trim(),
+    venue: event.venue,
+    city: event.location,
+    bannerImage: typeof event.spec_values.banner_image === 'string'
+      ? event.spec_values.banner_image
+      : 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&auto=format&fit=crop&q=80',
+    state,
+    totalTicketsSold: Number(event.ticket_count || 0),
+    checkedInCount: 0,
+    category: event.event_type,
+    gates: Array.isArray(event.spec_values.gates)
+      ? event.spec_values.gates.filter((value): value is string => typeof value === 'string')
+      : [],
   };
 }
 
-async function exchangeCallbackToken(token: string) {
-  const response = await fetch(`${API_BASE_URL}/api/auth/validator/me`, {
-    method: 'GET',
+function toTicketItem(ticket: ValidatorTicket): Ticket {
+  const metadata = ticket.metadata ?? {};
+  const ticketPrice = metadata.unit_price as { amount?: number; currency?: string } | undefined;
+  const orderTotal = metadata.order_total as { amount?: number; currency?: string } | undefined;
+  const ticketTier = typeof metadata.item_title === 'string' ? metadata.item_title : 'Event Ticket';
+  const purchaseDate = typeof metadata.paid_at === 'string'
+    ? metadata.paid_at
+    : typeof metadata.fulfilled_at === 'string'
+      ? metadata.fulfilled_at
+      : ticket.updated_at;
+
+  return {
+    id: ticket.id,
+    qrPayload: ticket.code,
+    eventId: ticket.event_id,
+    attendeeName: typeof metadata.buyer_id === 'string' ? `Buyer ${metadata.buyer_id}` : 'Verified Buyer',
+    attendeeEmail: '',
+    attendeePhone: '',
+    ticketTier,
+    seatOrZone: typeof metadata.venue === 'string' ? metadata.venue : undefined,
+    price: Number(ticketPrice?.amount ?? orderTotal?.amount ?? 0),
+    purchaseDate,
+    status: ticket.status as Ticket['status'],
+    lastGateName: typeof metadata.venue === 'string' ? metadata.venue : undefined,
+    notes: `Order ${ticket.order_id} · ${ticket.order_status}`,
+  };
+}
+
+function storeRemoteSnapshot(events: ValidatorEvent[], ticketsByEvent: Record<string, ValidatorTicket[]>) {
+  const tickets = Object.values(ticketsByEvent).flat();
+  localStorage.setItem(VALIDATOR_EVENTS_KEY, JSON.stringify(events.map((event) => toEventItem(event, event.creator_uid))));
+  localStorage.setItem(VALIDATOR_TICKETS_KEY, JSON.stringify(tickets.map(toTicketItem)));
+  localStorage.setItem(
+    VALIDATOR_SYNC_META_KEY,
+    JSON.stringify({
+      synced_at: new Date().toISOString(),
+      event_versions: events.map((event) => ({ id: event.id, version: event.version, updated_at: event.updated_at })),
+    }),
+  );
+}
+
+async function fetchJson<T>(path: string, token: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/json',
     },
   });
 
-  const rawText = await response.text();
-  let payload: ValidatorMeResponse | null = null;
-
-  try {
-    payload = rawText ? (JSON.parse(rawText) as ValidatorMeResponse) : null;
-  } catch {
-    payload = null;
-  }
-
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
   if (!response.ok) {
-    const message = payload && typeof payload === 'object' && 'message' in payload
-      ? String((payload as { message?: unknown }).message ?? 'Authentication failed')
-      : 'BuyMesho rejected the token';
+    const message = payload && typeof payload === 'object' && 'error' in payload ? String((payload as { error?: unknown }).error ?? 'Request failed') : 'Request failed';
     throw new Error(message);
   }
+  return payload as T;
+}
 
-  const identity = payload?.identity ?? payload?.validator_identity ?? payload?.user;
-  const scope = payload?.access_scope ?? payload?.scope ?? {};
+async function syncValidatorSnapshot(token: string) {
+  const me = await fetchJson<ValidatorMeResponse>('/api/validator/me', token);
+  const identity = me.identity;
+  const scope = me.access_scope ?? {};
+  const events = Array.isArray(me.events) ? me.events : [];
 
-  if (!identity?.uid || !identity.email) {
-    throw new Error('BuyMesho returned an incomplete identity');
+  if (!identity?.uid) {
+    throw new Error('BuyMesho returned an incomplete validator identity');
   }
 
-  return {
-    user: toValidatorUser(identity, scope),
-    sessionToken: payload?.session_token ?? token,
+  const ticketsByEvent: Record<string, ValidatorTicket[]> = {};
+  await Promise.all(
+    events.map(async (event) => {
+      const ticketsRes = await fetchJson<ValidatorEventTicketsResponse>(`/api/validator/events/${encodeURIComponent(event.id)}/tickets`, token);
+      ticketsByEvent[event.id] = Array.isArray(ticketsRes.tickets) ? ticketsRes.tickets : [];
+    }),
+  );
+
+  const user = toValidatorUser(identity, scope, events);
+  saveVerifiedSession(user, token);
+  storeRemoteSnapshot(events, ticketsByEvent);
+  window.__buymeshoValidatorRefresh = async () => {
+    await syncValidatorSnapshot(token);
   };
+  window.dispatchEvent(new Event('buymesho-validator-sync'));
+  return user;
 }
 
 function RedirectButton({
@@ -248,26 +311,13 @@ function RedirectButton({
   );
 }
 
-patchStorageBridge();
-
 export default function BuyMeshoGate() {
   const [authUser, setAuthUser] = useState<User | null>(() => readStoredAuthUser());
   const [loading, setLoading] = useState<boolean>(() => Boolean(readCallbackToken()) && !readStoredAuthUser());
   const [error, setError] = useState<string | null>(null);
 
-  const loginUrl = useMemo(() => {
-    return buildRedirectUrl(
-      import.meta.env.VITE_BUYMESHO_LOGIN_URL?.trim() || 'https://buymesho.vercel.app/login',
-      'login',
-    );
-  }, []);
-
-  const signupUrl = useMemo(() => {
-    return buildRedirectUrl(
-      import.meta.env.VITE_BUYMESHO_SIGNUP_URL?.trim() || 'https://buymesho.vercel.app/signup',
-      'signup',
-    );
-  }, []);
+  const loginUrl = useMemo(() => buildRedirectUrl(import.meta.env.VITE_BUYMESHO_LOGIN_URL?.trim() || 'https://buymesho.vercel.app/login', 'login'), []);
+  const signupUrl = useMemo(() => buildRedirectUrl(import.meta.env.VITE_BUYMESHO_SIGNUP_URL?.trim() || 'https://buymesho.vercel.app/signup', 'signup'), []);
 
   useEffect(() => {
     const token = readCallbackToken();
@@ -288,18 +338,15 @@ export default function BuyMeshoGate() {
 
     void (async () => {
       try {
-        const { user, sessionToken } = await exchangeCallbackToken(token);
+        const user = await syncValidatorSnapshot(token);
         if (cancelled) return;
-
-        persistVerifiedSession(user, sessionToken);
         setAuthUser(user);
         setError(null);
         setLoading(false);
         window.history.replaceState({}, '', buildReturnUrl());
       } catch (err) {
         if (cancelled) return;
-
-        clearAuthenticatedUser();
+        clearVerifiedSession();
         setAuthUser(null);
         setLoading(false);
         setError(err instanceof Error ? err.message : 'Authentication failed');
@@ -312,23 +359,18 @@ export default function BuyMeshoGate() {
   }, []);
 
   useEffect(() => {
-    const onAuthChange = () => {
-      const nextUser = readStoredAuthUser();
-      setAuthUser(nextUser);
-      if (!nextUser && !readCallbackToken()) {
-        setError(null);
-      }
-    };
-
-    window.addEventListener('buymesho-auth-change', onAuthChange);
-    return () => window.removeEventListener('buymesho-auth-change', onAuthChange);
+    const onAuthChange = () => setAuthUser(readStoredAuthUser());
+    window.addEventListener('buymesho-validator-sync', onAuthChange);
+    return () => window.removeEventListener('buymesho-validator-sync', onAuthChange);
   }, []);
 
   const handleStart = () => {
+    setError(null);
     window.location.href = loginUrl;
   };
 
   const handleSignup = () => {
+    setError(null);
     window.location.href = signupUrl;
   };
 
@@ -346,11 +388,11 @@ export default function BuyMeshoGate() {
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-[0.3em] text-white/55">BuyMesho identity required</div>
-              <h1 className="text-2xl font-semibold tracking-tight">Verifying session</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Syncing remote snapshot</h1>
             </div>
           </div>
           <p className="mt-4 text-sm leading-6 text-white/70">
-            Exchanging your BuyMesho callback token for a validator session.
+            Fetching your creator events and ticket snapshots from BuyMesho.
           </p>
         </div>
       </div>
@@ -407,12 +449,12 @@ export default function BuyMeshoGate() {
         <div className="rounded-[2rem] border border-white/10 bg-white/5 p-5 text-sm text-white/65">
           <div className="mb-3 flex items-center gap-2 text-white">
             <ShieldCheck className="h-4 w-4" />
-            <span className="font-medium">Phase 1 bridge</span>
+            <span className="font-medium">Phase 2 sync</span>
           </div>
           <ul className="space-y-2 leading-6">
-            <li>• BuyMesho issues the identity.</li>
-            <li>• Ticket Validator verifies the callback token with BuyMesho before opening the app.</li>
-            <li>• Logout clears the cached session and returns to the BuyMesho handoff.</li>
+            <li>• BuyMesho now provides the creator events and ticket snapshots.</li>
+            <li>• Ticket Validator only caches the synced read model.</li>
+            <li>• Scan/write actions stay out until the next phase.</li>
           </ul>
         </div>
       </div>
