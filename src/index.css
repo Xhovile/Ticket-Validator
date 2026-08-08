@@ -11,18 +11,49 @@
     --text-secondary: #6b7280;
   }
 
+  html {
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
   html, body, button, input, select, textarea {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   }
 
   body {
-    background-color: #f8fafc;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top, rgba(15, 23, 42, 0.04), transparent 38%),
+      linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
     color: #111827;
     -webkit-tap-highlight-color: transparent;
   }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: rgba(37, 99, 235, 0.18);
+    color: #111827;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    outline: none;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  }
 }
 
-/* Outdoor Sunlight High Contrast Mode */
 .sunlight-high-contrast {
   filter: contrast(135%) saturate(120%);
 }
@@ -64,7 +95,6 @@
   border-color: #64748b !important;
 }
 
-/* Custom subtle scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -83,7 +113,6 @@
   background: #94a3b8;
 }
 
-/* Flash Animations for Scanner Feedback */
 @keyframes flash-green {
   0% { background-color: rgba(22, 163, 74, 0.4); transform: scale(1.02); }
   50% { background-color: rgba(22, 163, 74, 0.2); }
