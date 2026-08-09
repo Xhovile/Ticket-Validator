@@ -5,32 +5,8 @@
       "destination": "https://buymesho.onrender.com/api/validator/:path*"
     },
     {
-      "source": "/events",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/scanner",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/attendees",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/events/",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/scanner/",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/attendees/",
-      "destination": "/index.html"
-    },
-    {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/"
     }
   ]
 }
