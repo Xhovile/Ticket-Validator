@@ -29,14 +29,14 @@ export function ValidatorWorkspace({ controller }: { controller: ValidatorContro
 
   if (isAuthenticating) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center px-6">
-        <div className="flex flex-col items-center text-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-lg">
+      <div className="flex min-h-screen items-center justify-center bg-[#fafafa] px-6 text-zinc-900">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm shadow-indigo-600/20">
             <Loader2 className="h-5 w-5 animate-spin" />
           </div>
           <div>
-            <p className="text-sm font-semibold">Verifying BuyMesho access</p>
-            <p className="mt-1 text-xs text-slate-500">Preparing Ticket Validator...</p>
+            <p className="text-sm font-semibold tracking-tight">Verifying BuyMesho access</p>
+            <p className="mt-1 text-xs text-zinc-500">Preparing Ticket Validator...</p>
           </div>
         </div>
       </div>
@@ -45,32 +45,16 @@ export function ValidatorWorkspace({ controller }: { controller: ValidatorContro
 
   if (authError || !currentUser) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900">
-        <Header
-          user={null}
-          onLogout={handleLogout}
-          onSwitchUser={handleSwitchUser}
-          activeSession={null}
-          isHighContrast={isHighContrast}
-          onToggleHighContrast={toggleHighContrast}
-        />
-        <main className="min-h-[75vh] flex items-center justify-center px-6">
-          <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
-              <ShieldAlert className="h-6 w-6" />
+      <div className="min-h-screen bg-[#fafafa] text-zinc-900">
+        <Header user={null} onLogout={handleLogout} onSwitchUser={handleSwitchUser} activeSession={null} isHighContrast={isHighContrast} onToggleHighContrast={toggleHighContrast} />
+        <main className="mx-auto flex min-h-[calc(100vh-64px)] w-full max-w-md items-center justify-center px-5 py-10">
+          <div className="w-full rounded-2xl border border-zinc-200 bg-white p-6 text-center shadow-sm">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
+              <ShieldAlert className="h-5 w-5" />
             </div>
-            <h2 className="mt-4 text-lg font-semibold">Access unavailable</h2>
-            <p className="mt-2 text-xs leading-5 text-slate-500">
-              {authError || 'Your BuyMesho account could not be verified.'}
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                clearToken();
-                window.location.reload();
-              }}
-              className="mt-5 min-h-[44px] w-full rounded-xl bg-slate-950 px-4 py-3 text-xs font-semibold text-white transition hover:bg-slate-800"
-            >
+            <h2 className="mt-4 text-base font-semibold tracking-tight">Access unavailable</h2>
+            <p className="mt-2 text-xs leading-5 text-zinc-500">{authError || 'Your BuyMesho account could not be verified.'}</p>
+            <button type="button" onClick={() => { clearToken(); window.location.reload(); }} className="mt-5 min-h-11 w-full rounded-xl bg-zinc-950 px-4 py-3 text-xs font-semibold text-white transition hover:bg-zinc-800">
               Return to BuyMesho Sign In
             </button>
           </div>
@@ -80,16 +64,8 @@ export function ValidatorWorkspace({ controller }: { controller: ValidatorContro
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
-      <Header
-        user={currentUser}
-        onLogout={handleLogout}
-        onSwitchUser={handleSwitchUser}
-        activeSession={activeSession}
-        activeEventName={selectedEvent?.name}
-        isHighContrast={isHighContrast}
-        onToggleHighContrast={toggleHighContrast}
-      />
+    <div className="min-h-screen bg-[#fafafa] font-sans text-zinc-900 antialiased selection:bg-indigo-100 selection:text-indigo-900">
+      <Header user={currentUser} onLogout={handleLogout} onSwitchUser={handleSwitchUser} activeSession={activeSession} activeEventName={selectedEvent?.name} isHighContrast={isHighContrast} onToggleHighContrast={toggleHighContrast} />
 
       <OfflineSyncBanner
         isOnline={isOnline}
@@ -98,42 +74,29 @@ export function ValidatorWorkspace({ controller }: { controller: ValidatorContro
         isSyncing={isSyncing}
         onToggleSimulatedOffline={() => setIsSimulatedOffline((previous) => !previous)}
         onSyncNow={handleSyncNow}
-        onClearQueue={() => {
-          clearOfflineQueue();
-          setOfflineQueue([]);
-        }}
+        onClearQueue={() => { clearOfflineQueue(); setOfflineQueue([]); }}
       />
 
       {syncToastMessage && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-bold border border-emerald-400 animate-in fade-in slide-in-from-top-4">
-          <CheckCircle2 className="w-4 h-4 text-white" />
+        <div className="fixed left-1/2 top-[76px] z-50 flex -translate-x-1/2 items-center gap-2 rounded-full border border-emerald-200 bg-white px-3.5 py-2 text-[11px] font-semibold text-emerald-700 shadow-lg" role="status">
+          <CheckCircle2 className="h-3.5 w-3.5" />
           <span>{syncToastMessage}</span>
         </div>
       )}
 
-      <main className="transition-all duration-200">
+      <main className="mx-auto min-h-[calc(100vh-64px)] w-full max-w-5xl px-3 pb-24 pt-3 transition-all duration-200 sm:px-5 sm:pb-28 sm:pt-5">
         {currentTab === 'events' && (
           <>
             {viewState === 'list' || !selectedEvent ? (
-              <EventsView
-                user={currentUser}
-                events={events}
-                selectedEvent={selectedEvent}
-                onSelectEvent={handleSelectEvent}
-                permissionError={permissionError}
-                onClearPermissionError={() => setPermissionError(null)}
-              />
+              <EventsView user={currentUser} events={events} selectedEvent={selectedEvent} onSelectEvent={handleSelectEvent} permissionError={permissionError} onClearPermissionError={() => setPermissionError(null)} />
             ) : (
               <EventDetailView
                 event={selectedEvent}
                 isLoading={isDetailLoading}
                 onBack={() => setViewState('list')}
                 onStartScanning={() => {
-                  if (activeSession && activeSession.active && activeSession.eventId === selectedEvent.id) {
-                    setCurrentTab('scan');
-                  } else {
-                    setShowSessionModal(true);
-                  }
+                  if (activeSession && activeSession.active && activeSession.eventId === selectedEvent.id) setCurrentTab('scan');
+                  else setShowSessionModal(true);
                 }}
                 onViewAttendees={() => {
                   setCurrentTab('attendees');
@@ -147,29 +110,11 @@ export function ValidatorWorkspace({ controller }: { controller: ValidatorContro
         )}
 
         {currentTab === 'scan' && selectedEvent && (
-          <ScannerView
-            event={selectedEvent}
-            session={activeSession}
-            tickets={tickets}
-            onScanTicket={handleScanTicket}
-            onBackToEvent={() => setCurrentTab('events')}
-            onStartSessionRequest={() => setShowSessionModal(true)}
-            isContinuousScan={isContinuousScan}
-            onToggleContinuousScan={() => setIsContinuousScan((previous) => !previous)}
-          />
+          <ScannerView event={selectedEvent} session={activeSession} tickets={tickets} onScanTicket={handleScanTicket} onBackToEvent={() => setCurrentTab('events')} onStartSessionRequest={() => setShowSessionModal(true)} isContinuousScan={isContinuousScan} onToggleContinuousScan={() => setIsContinuousScan((previous) => !previous)} />
         )}
 
         {currentTab === 'attendees' && selectedEvent && (
-          <AttendeesView
-            event={selectedEvent}
-            tickets={tickets}
-            isLoading={isAttendeesLoading || isTicketsLoading}
-            onSelectTicket={(ticket) => setSelectedTicketForDetail(ticket)}
-            onUpdateStatusDirect={(ticketId, status) => {
-              updateTicketStatus(ticketId, status);
-              soundFX.playClick();
-            }}
-          />
+          <AttendeesView event={selectedEvent} tickets={tickets} isLoading={isAttendeesLoading || isTicketsLoading} onSelectTicket={(ticket) => setSelectedTicketForDetail(ticket)} onUpdateStatusDirect={(ticketId, status) => { updateTicketStatus(ticketId, status); soundFX.playClick(); }} />
         )}
       </main>
 
@@ -180,48 +125,20 @@ export function ValidatorWorkspace({ controller }: { controller: ValidatorContro
           isDuplicateScan={activeScanResult.isDuplicate}
           isOfflineQueued={activeScanResult.isOfflineQueued}
           isContinuousMode={isContinuousScan}
-          onUpdateStatus={(newStatus) => {
-            updateTicketStatus(activeScanResult.ticket.id, newStatus);
-            handleDismissResult();
-            soundFX.playClick();
-          }}
+          onUpdateStatus={(newStatus) => { updateTicketStatus(activeScanResult.ticket.id, newStatus); handleDismissResult(); soundFX.playClick(); }}
           onDismiss={handleDismissResult}
         />
       )}
 
       {showSessionModal && selectedEvent && (
-        <CheckInSessionModal
-          event={selectedEvent}
-          user={currentUser}
-          onClose={() => setShowSessionModal(false)}
-          onConfirmStartSession={handleStartSessionConfirm}
-        />
+        <CheckInSessionModal event={selectedEvent} user={currentUser} onClose={() => setShowSessionModal(false)} onConfirmStartSession={handleStartSessionConfirm} />
       )}
 
       {selectedTicketForDetail && (
-        <TicketDetailModal
-          ticket={selectedTicketForDetail}
-          onClose={() => setSelectedTicketForDetail(null)}
-          onUpdateStatus={(ticketId, newStatus) => {
-            updateTicketStatus(ticketId, newStatus);
-            soundFX.playClick();
-          }}
-        />
+        <TicketDetailModal ticket={selectedTicketForDetail} onClose={() => setSelectedTicketForDetail(null)} onUpdateStatus={(ticketId, newStatus) => { updateTicketStatus(ticketId, newStatus); soundFX.playClick(); }} />
       )}
 
-      <FooterNavigation
-        currentTab={currentTab}
-        onTabChange={(tab) => {
-          if (tab === 'attendees' && currentTab !== 'attendees') {
-            setIsAttendeesLoading(true);
-            setTimeout(() => setIsAttendeesLoading(false), 300);
-          }
-          setCurrentTab(tab);
-          setPermissionError(null);
-        }}
-        isScanningActive={Boolean(activeSession && activeSession.active)}
-        hasActiveEvent={Boolean(selectedEvent)}
-      />
+      <FooterNavigation currentTab={currentTab} onTabChange={(tab) => { if (tab === 'attendees' && currentTab !== 'attendees') { setIsAttendeesLoading(true); setTimeout(() => setIsAttendeesLoading(false), 300); } setCurrentTab(tab); setPermissionError(null); }} isScanningActive={Boolean(activeSession && activeSession.active)} hasActiveEvent={Boolean(selectedEvent)} />
     </div>
   );
 }
