@@ -1,9 +1,8 @@
 import { auth, getFreshIdToken } from '../firebase';
 
-// Use the BuyMesho backend directly when configured. This avoids depending on
-// the Vercel rewrite for the authentication handoff while keeping same-origin
-// behavior as the fallback for existing deployments.
-const API_BASE_URL = (import.meta.env.VITE_BUYMESHO_API_BASE_URL ?? '').trim().replace(/\/$/, '');
+// Keep Validator API requests same-origin. Vercel proxies /api/validator/*
+// to the BuyMesho backend, avoiding browser-to-Render CORS during auth handoff.
+const API_BASE_URL = '';
 
 export type ValidatorIdentity = {
   uid: string;
@@ -163,14 +162,12 @@ export async function exchangeValidatorSession(token: string) {
 
     return payload as SessionExchangeResponse;
   } catch (error) {
-    // Preserve HTTP errors so the gate can distinguish authorization failures
-    // from genuine network/CORS/backend failures.
     if (error && typeof error === 'object' && 'status' in error) throw error;
 
     const message = error instanceof Error ? error.message : String(error);
     throw Object.assign(
       new Error(`Unable to reach BuyMesho Validator API: ${message}`),
-      { cause: error },
+      { status: 0, cause: error },
     );
   }
 }
