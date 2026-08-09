@@ -1,6 +1,9 @@
 import { auth, getFreshIdToken } from '../firebase';
 
-const API_BASE_URL = "";
+// Use the BuyMesho backend directly when configured. This avoids depending on
+// the Vercel rewrite for the authentication handoff while keeping same-origin
+// behavior as the fallback for existing deployments.
+const API_BASE_URL = (import.meta.env.VITE_BUYMESHO_API_BASE_URL ?? '').trim().replace(/\/$/, '');
 
 export type ValidatorIdentity = {
   uid: string;
@@ -100,8 +103,6 @@ async function requireFreshFirebaseToken() {
     throw Object.assign(new Error('No authenticated Firebase user.'), { status: 401 });
   }
 
-  // Firebase Auth owns the session. getIdToken() automatically refreshes the
-  // ID token when necessary; no application-level token cache is involved.
   return getFreshIdToken();
 }
 
@@ -131,30 +132,47 @@ async function fetchJson<T>(path: string, _unusedToken?: string, init?: RequestI
   return payload as T;
 }
 
-// The callback token is used only for the one-time BuyMesho -> Validator
-// exchange. It is never stored as the Validator's client-side session.
 export async function exchangeValidatorSession(token: string) {
-  const response = await fetch(`${API_BASE_URL}/api/validator/session`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({}),
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/validator/session`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
 
-  const payload = await response.json().catch(() => ({}));
+    const payload = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    const error = payload && typeof payload === "object" && "error" in payload
-      ? String((payload as { error?: unknown }).error ?? "Request failed")
-      : "Request failed";
+    if (!response.ok) {
+      const error = payload && typeof payload === "object" && "error" in payload
+        ? String((payload as { error?: unknown }).error ?? "Request failed")
+        : `BuyMesho returned HTTP ${response.status}`;
 
-    throw Object.assign(new Error(error), { status: response.status, payload });
+      throw Object.assign(new Error(error), { status: response.status, payload });
+    }
+
+    if (!payload || typeof payload.customToken !== "string" || !payload.customToken) {
+      throw Object.assign(new Error("BuyMesho returned an invalid Validator session response."), {
+        status: 502,
+        payload,
+      });
+    }
+
+    return payload as SessionExchangeResponse;
+  } catch (error) {
+    // Preserve HTTP errors so the gate can distinguish authorization failures
+    // from genuine network/CORS/backend failures.
+    if (error && typeof error === 'object' && 'status' in error) throw error;
+
+    const message = error instanceof Error ? error.message : String(error);
+    throw Object.assign(
+      new Error(`Unable to reach BuyMesho Validator API: ${message}`),
+      { cause: error },
+    );
   }
-
-  return payload as SessionExchangeResponse;
 }
 
 export async function fetchValidatorMe(token?: string) {
@@ -216,10 +234,6 @@ export async function syncQueuedValidations(
   });
 }
 
-// Compatibility helpers for the current application code. These DO NOT hold
-// or return an ID token. They only expose Firebase's current auth state as a
-// truthy marker so existing guards can be migrated without creating a second
-// session authority.
 export function getStoredToken() {
   return auth.currentUser ? 'firebase-authenticated' : '';
 }
