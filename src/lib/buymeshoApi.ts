@@ -1,3 +1,5 @@
+import { getFreshIdToken, getLatestIdToken, auth } from '../firebase';
+
 const API_BASE_URL = "";
 
 export type ValidatorIdentity = {
@@ -88,12 +90,29 @@ export type ScanResponse = {
   };
 };
 
+type SessionExchangeResponse = {
+  success: boolean;
+  customToken: string;
+};
+
+async function resolveToken(fallbackToken?: string) {
+  const freshToken = await getFreshIdToken();
+  if (freshToken) return freshToken;
+
+  const cachedToken = getLatestIdToken();
+  if (cachedToken) return cachedToken;
+
+  return fallbackToken ?? getStoredToken();
+}
+
 async function fetchJson<T>(path: string, token: string, init?: RequestInit): Promise<T> {
+  const effectiveToken = await resolveToken(token);
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${effectiveToken}`,
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
     },
@@ -114,6 +133,13 @@ async function fetchJson<T>(path: string, token: string, init?: RequestInit): Pr
   }
 
   return payload as T;
+}
+
+export async function exchangeValidatorSession(token: string) {
+  return fetchJson<SessionExchangeResponse>("/api/validator/session", token, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export async function fetchValidatorMe(token: string) {
@@ -176,6 +202,9 @@ export async function syncQueuedValidations(
 }
 
 export function getStoredToken() {
+  const currentToken = getLatestIdToken();
+  if (currentToken) return currentToken;
+
   try {
     return localStorage.getItem("buymesho_validator_session") ?? "";
   } catch {
@@ -188,6 +217,14 @@ export function saveToken(token: string) {
     if (token) localStorage.setItem("buymesho_validator_session", token);
     else localStorage.removeItem("buymesho_validator_session");
   } catch {}
+}
+
+export async function signOutValidator() {
+  try {
+    await auth.signOut();
+  } finally {
+    saveToken("");
+  }
 }
 
 export function clearToken() {
