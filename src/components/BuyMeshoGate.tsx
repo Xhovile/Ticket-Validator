@@ -1,7 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, LogIn, ScanLine, ShieldCheck } from 'lucide-react';
+import { ArrowRight, LogIn, ScanLine, ShieldCheck, Loader2 } from 'lucide-react';
+import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import App from '../App';
-import { clearToken, getStoredToken, saveToken } from '../lib/buymeshoApi';
+import { auth } from '../firebase';
+import {
+  clearToken,
+  exchangeValidatorSession,
+  getStoredToken,
+  saveToken,
+} from '../lib/buymeshoApi';
 
 function buildReturnUrl() {
   return `${window.location.origin}${window.location.pathname}`;
@@ -91,7 +98,8 @@ function ActionButton({
 
 export default function BuyMeshoGate() {
   const [authToken, setAuthToken] = useState(() => getStoredToken());
-  const [ready, setReady] = useState(() => Boolean(getStoredToken()));
+  const [ready, setReady] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   const loginUrl = useMemo(
     () =>
@@ -103,27 +111,74 @@ export default function BuyMeshoGate() {
   );
 
   useEffect(() => {
-    const token = extractCallbackToken();
+    let cancelled = false;
+    let callbackHandled = false;
 
-    if (token) {
-      saveToken(token);
-      setAuthToken(token);
-      setReady(true);
-      clearTokenFromUrl();
-      return;
-    }
+    const callbackToken = extractCallbackToken();
 
-    const storedToken = getStoredToken();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (cancelled) return;
 
-    if (storedToken) {
-      setAuthToken(storedToken);
-      setReady(true);
-      return;
-    }
+      try {
+        if (callbackToken && !callbackHandled) {
+          callbackHandled = true;
+          clearTokenFromUrl();
 
-    clearToken();
-    setReady(false);
+          const exchange = await exchangeValidatorSession(callbackToken);
+          if (cancelled) return;
+
+          await signInWithCustomToken(auth, exchange.customToken);
+          return;
+        }
+
+        if (user) {
+          const token = await user.getIdToken();
+          if (cancelled) return;
+
+          saveToken(token);
+          setAuthToken(token);
+          setReady(true);
+          setCheckingSession(false);
+          return;
+        }
+
+        if (callbackToken && !callbackHandled) return;
+
+        clearToken();
+        setAuthToken('');
+        setReady(false);
+        setCheckingSession(false);
+      } catch (error) {
+        console.error('Unable to restore Ticket Validator session:', error);
+        clearTokenFromUrl();
+        clearToken();
+        setAuthToken('');
+        setReady(false);
+        setCheckingSession(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-slate-950 px-4 text-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-950 shadow-lg">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold">Restoring your session</p>
+            <p className="mt-1 text-xs text-white/50">Preparing Ticket Validator...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (authToken && ready) {
     return <App />;
