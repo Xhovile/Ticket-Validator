@@ -137,9 +137,8 @@ export default function BuyMeshoGate() {
                 <ScanLine className="h-7 w-7" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[10px] uppercase tracking-[0.35em] text-white/45">BuyMesho access</div>
+                <div className="text-[10px] uppercase tracking-[0.35em] text-white/45">BuyMesho</div>
                 <h1 className="mt-1 text-3xl font-semibold tracking-tight">Ticket Validator</h1>
-                <p className="mt-2 text-sm leading-6 text-white/65">Pick a secure sign-in path and continue.</p>
               </div>
             </div>
 
@@ -149,14 +148,14 @@ export default function BuyMeshoGate() {
                 primary
                 icon={<LogIn className="h-5 w-5" />}
                 label="Continue with BuyMesho"
-                caption="Use an existing validator or creator account."
+                caption="Use an existing BuyMesho event creator account."
               />
 
               <ActionButton
                 href={signupUrl}
                 icon={<UserPlus className="h-5 w-5" />}
                 label="Create BuyMesho access"
-                caption="Register a new creator account in BuyMesho."
+                caption="Register a new event creator account in BuyMesho."
               />
             </div>
           </div>
@@ -164,9 +163,7 @@ export default function BuyMeshoGate() {
           <div className="flex items-center justify-between gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/55">
             <span className="inline-flex items-center gap-2">
               <ShieldCheck className="h-3.5 w-3.5" />
-              Secure validator session
-            </span>
-            <span>BuyMesho-connected</span>
+              SECURE. TRUSTED.
           </div>
 
           <div className="text-center text-[11px] uppercase tracking-[0.22em] text-white/30">
