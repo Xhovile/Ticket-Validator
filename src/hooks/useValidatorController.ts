@@ -9,6 +9,19 @@ import { mapValidatorTicket } from '../lib/validatorMappers';
 import { buildValidatorSession } from '../lib/validatorSession';
 import { useValidatorScanner } from './useValidatorScanner';
 
+function tabFromPathname(pathname: string): NavTab {
+  const path = pathname.replace(/\/+$/, '') || '/';
+  if (path === '/scanner') return 'scan';
+  if (path === '/attendees') return 'attendees';
+  return 'events';
+}
+
+function pathForTab(tab: NavTab): string {
+  if (tab === 'scan') return '/scanner';
+  if (tab === 'attendees') return '/attendees';
+  return '/events';
+}
+
 export function useValidatorController() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -19,7 +32,7 @@ export function useValidatorController() {
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isTicketsLoading, setIsTicketsLoading] = useState(false);
-  const [currentTab, setCurrentTab] = useState<NavTab>('events');
+  const [currentTab, setCurrentTab] = useState<NavTab>(() => tabFromPathname(window.location.pathname));
   const [viewState, setViewState] = useState<'list' | 'detail'>('list');
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
@@ -32,6 +45,29 @@ export function useValidatorController() {
   const [offlineQueue, setOfflineQueue] = useState<QueuedValidation[]>(() => getOfflineQueue());
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
+
+  // Keep the browser URL synchronized with the active workspace section.
+  // replaceState is intentional: the navigation tabs represent application state,
+  // while browser history remains available for external navigation and auth redirects.
+  useEffect(() => {
+    const targetPath = pathForTab(currentTab);
+    const currentPath = window.location.pathname.replace(/\/+$/, '') || '/';
+    if (currentPath !== targetPath) {
+      window.history.replaceState({}, document.title, `${targetPath}${window.location.search}${window.location.hash}`);
+    }
+  }, [currentTab]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentTab(tabFromPathname(window.location.pathname));
+      setViewState('list');
+      setPermissionError(null);
+      setSelectedTicketForDetail(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle('sunlight-high-contrast', isHighContrast);
@@ -72,8 +108,11 @@ export function useValidatorController() {
         setActiveSession(validStoredSession);
         setSelectedEvent(mappedEvents.find((event) => event.id === validStoredSession?.eventId) || mappedEvents[0] || null);
         if (!validStoredSession) {
-          setCurrentTab('events');
+          setCurrentTab(tabFromPathname(window.location.pathname));
           setViewState('list');
+        } else {
+          // Preserve a directly requested URL such as /scanner or /attendees on refresh.
+          setCurrentTab(tabFromPathname(window.location.pathname));
         }
         setIsAuthenticating(false);
       } catch (error: any) {
