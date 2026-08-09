@@ -1,70 +1,50 @@
-const CACHE_NAME = 'buymesho-gate-v1';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json'
-];
+const CACHE = "buymesho-validator-v5";
+const SHELL = ["/", "/index.html", "/manifest.json", "/vite.svg"];
 
-self.addEventListener('install', (event) => {
+self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()),
   );
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
-      );
-    }).then(() => self.clients.claim())
-  );
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match('/index.html') || caches.match('/');
-      })
-    );
-    return;
-  }
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  const isNavigation = request.mode === "navigate";
+  const isAsset = SHELL.includes(url.pathname) || url.pathname.startsWith("/assets/") || url.pathname.endsWith(".js") || url.pathname.endsWith(".css");
+
+  if (!isNavigation && !isAsset) return;
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        fetch(event.request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-          }
-        }).catch(() => {});
-        return cachedResponse;
-      }
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+    caches.match(request).then(async (cached) => {
+      try {
+        const fresh = await fetch(request);
+        const cache = await caches.open(CACHE);
+        cache.put(request, fresh.clone());
+        return fresh;
+      } catch {
+        if (cached) return cached;
+        if (isNavigation) {
+          return caches.match("/index.html");
         }
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
-        return networkResponse;
-      });
-    }).catch(() => {})
+        return new Response("Offline", { status: 503, headers: { "Content-Type": "text/plain" } });
+      }
+    }),
   );
 });
 
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-ticket-validations') {
+self.addEventListener("sync", (event) => {
+  if (event.tag === "sync-ticket-validations") {
     event.waitUntil(
-      self.clients.matchAll().then((clients) => {
-        clients.forEach((client) => {
-          client.postMessage({ type: 'BACKGROUND_SYNC_TRIGGERED' });
-        });
-      })
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+        for (const client of clients) client.postMessage({ type: "BACKGROUND_SYNC_TRIGGERED" });
+      }),
     );
   }
 });
