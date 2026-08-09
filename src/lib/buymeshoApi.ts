@@ -161,14 +161,31 @@ async function fetchJson<T>(path: string, _unusedToken?: string, init?: RequestI
   if (result.response.status === 401) {
     try {
       effectiveToken = await requireFreshFirebaseToken(true);
+    } catch (error) {
+      // A failed token refresh is not proof of revocation. It can simply be a
+      // temporary network failure, so preserve the Firebase session.
+      const message = error instanceof Error ? error.message : String(error);
+      throw Object.assign(new Error(`Unable to refresh the Firebase ID token: ${message}`), {
+        status: 0,
+        cause: error,
+      });
+    }
+
+    try {
       result = await requestJson<T>(path, effectiveToken, init);
     } catch (error) {
+      // The refreshed token exists locally, but the API may be temporarily
+      // unreachable. Again, do not sign the user out for a transport failure.
       const message = error instanceof Error ? error.message : String(error);
-      await signOutValidator().catch(() => undefined);
-      throw Object.assign(new Error(message), { status: 401, cause: error });
+      throw Object.assign(new Error(`Unable to reach BuyMesho Validator API: ${message}`), {
+        status: 0,
+        cause: error,
+      });
     }
 
     if (result.response.status === 401) {
+      // The Firebase token was successfully refreshed and BuyMesho still
+      // rejected it. This is the genuinely invalid/revoked authorization case.
       await signOutValidator().catch(() => undefined);
       throw buildApiError(result.response, result.payload);
     }
@@ -205,7 +222,7 @@ export async function exchangeValidatorSession(token: string) {
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const error = payload && typeof payload === "object" && "error" in payload
+      const error = payload && typeof payload === "object' && "error" in payload
         ? String((payload as { error?: unknown }).error ?? "Request failed")
         : `BuyMesho returned HTTP ${response.status}`;
 
