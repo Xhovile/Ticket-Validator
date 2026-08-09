@@ -29,14 +29,14 @@ export function ValidatorWorkspace({ controller }: { controller: ValidatorContro
 
   if (isAuthenticating) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
+      <div className="flex min-h-screen items-center justify-center bg-white px-6 text-black">
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-slate-950 shadow-sm shadow-black/20">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#020617] text-white shadow-sm shadow-black/20">
             <Loader2 className="h-5 w-5 animate-spin" />
           </div>
           <div>
-            <p className="text-sm font-semibold tracking-tight text-white">Verifying BuyMesho access</p>
-            <p className="mt-1 text-xs text-white/50">Preparing Ticket Validator...</p>
+            <p className="text-sm font-semibold tracking-tight text-black">Verifying BuyMesho access</p>
+            <p className="mt-1 text-xs text-black/60">Preparing Ticket Validator...</p>
           </div>
         </div>
       </div>
@@ -60,7 +60,6 @@ export function ValidatorWorkspace({ controller }: { controller: ValidatorContro
   }
 
   const handleNavChange = (tab: 'events' | 'scan' | 'attendees') => {
-    // Clicking the already-selected tab returns that section to its landing state.
     if (tab === currentTab) {
       if (tab === 'events') {
         setViewState('list');
