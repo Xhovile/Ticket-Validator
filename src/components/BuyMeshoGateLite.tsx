@@ -88,7 +88,7 @@ export default function BuyMeshoGateLite() {
   const [authToken, setAuthToken] = useState(() => getStoredToken());
   const [isLoading, setIsLoading] = useState<boolean>(Boolean(getStoredToken()));
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState<boolean>(() => Boolean(localStorage.getItem(VALIDATOR_USER_KEY)));
 
   const loginUrl = useMemo(
     () => buildRedirectUrl(import.meta.env.VITE_BUYMESHO_LOGIN_URL?.trim() || "https://buymesho.vercel.app/login", "login"),
@@ -112,12 +112,12 @@ export default function BuyMeshoGateLite() {
     if (storedToken && storedToken !== authToken) {
       setAuthToken(storedToken);
     }
-  }, [authToken]);
+  }, []);
 
   useEffect(() => {
     if (!authToken) {
       setIsLoading(false);
-      setReady(false);
+      setReady(Boolean(localStorage.getItem(VALIDATOR_USER_KEY)));
       return;
     }
 
@@ -165,7 +165,7 @@ export default function BuyMeshoGateLite() {
           localStorage.removeItem(VALIDATOR_EVENTS_KEY);
           localStorage.removeItem(VALIDATOR_TICKETS_KEY);
           setAuthToken("");
-          setReady(false);
+          setReady(Boolean(localStorage.getItem(VALIDATOR_USER_KEY)));
           setError(err instanceof Error ? err.message : "Authentication failed");
         }
       } finally {
