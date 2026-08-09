@@ -1,5 +1,10 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, onIdTokenChanged } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  getAuth,
+  onIdTokenChanged,
+  setPersistence,
+} from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyDlT_IH_p6XBwEc_8gwG_2IWUXmcitAmLM',
@@ -14,11 +19,16 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Firebase Auth is the sole client-side session authority.
-// Firebase persists the user session and automatically refreshes ID tokens.
-// The application must not maintain a second authentication/session cache.
+// Explicit LOCAL persistence keeps the authenticated user across refreshes
+// and browser/tab close-and-reopen. Firebase also manages ID-token refresh.
+void setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('Unable to enable Firebase local auth persistence:', error);
+});
+
+// Keep Firebase's token lifecycle active without copying the token into a
+// second application-managed cache.
 onIdTokenChanged(auth, () => {
-  // Intentionally empty. Registering the listener keeps Firebase's auth
-  // lifecycle active without duplicating its state anywhere else.
+  // Intentionally empty. Firebase Auth remains the source of truth.
 });
 
 export async function getFreshIdToken(forceRefresh = false) {
