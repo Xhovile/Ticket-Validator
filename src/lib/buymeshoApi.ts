@@ -1,4 +1,4 @@
-import { getFreshIdToken, getLatestIdToken, auth } from '../firebase';
+import { getFreshIdToken, getLatestIdToken, setLatestIdToken, auth } from '../firebase';
 
 const API_BASE_URL = "";
 
@@ -136,8 +136,7 @@ async function fetchJson<T>(path: string, token: string, init?: RequestInit): Pr
 }
 
 // The callback token must be used exactly as received from BuyMesho. It may
-// represent a newly authenticated user, so do not substitute the current
-// Ticket Validator Firebase user token during this exchange.
+// represent a newly authenticated user, so do not substitute another token.
 export async function exchangeValidatorSession(token: string) {
   const response = await fetch(`${API_BASE_URL}/api/validator/session`, {
     method: "POST",
@@ -226,21 +225,11 @@ export async function syncQueuedValidations(
 }
 
 export function getStoredToken() {
-  const currentToken = getLatestIdToken();
-  if (currentToken) return currentToken;
-
-  try {
-    return localStorage.getItem("buymesho_validator_session") ?? "";
-  } catch {
-    return "";
-  }
+  return getLatestIdToken();
 }
 
 export function saveToken(token: string) {
-  try {
-    if (token) localStorage.setItem("buymesho_validator_session", token);
-    else localStorage.removeItem("buymesho_validator_session");
-  } catch {}
+  setLatestIdToken(token);
 }
 
 export async function signOutValidator() {
