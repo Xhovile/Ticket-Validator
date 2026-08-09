@@ -135,11 +135,35 @@ async function fetchJson<T>(path: string, token: string, init?: RequestInit): Pr
   return payload as T;
 }
 
+// The callback token must be used exactly as received from BuyMesho. It may
+// represent a newly authenticated user, so do not substitute the current
+// Ticket Validator Firebase user token during this exchange.
 export async function exchangeValidatorSession(token: string) {
-  return fetchJson<SessionExchangeResponse>("/api/validator/session", token, {
+  const response = await fetch(`${API_BASE_URL}/api/validator/session`, {
     method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({}),
   });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error =
+      payload && typeof payload === "object" && "error" in payload
+        ? String((payload as { error?: unknown }).error ?? "Request failed")
+        : "Request failed";
+
+    throw Object.assign(new Error(error), {
+      status: response.status,
+      payload,
+    });
+  }
+
+  return payload as SessionExchangeResponse;
 }
 
 export async function fetchValidatorMe(token: string) {
