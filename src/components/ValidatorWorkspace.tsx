@@ -29,10 +29,15 @@ export function ValidatorWorkspace({ controller }: { controller: ValidatorContro
 
   if (isAuthenticating) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#fafafa] px-6 text-zinc-900">
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm shadow-indigo-600/20"><Loader2 className="h-5 w-5 animate-spin" /></div>
-          <div><p className="text-sm font-semibold tracking-tight">Verifying BuyMesho access</p><p className="mt-1 text-xs text-zinc-500">Preparing Ticket Validator...</p></div>
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-slate-950 shadow-sm shadow-black/20">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold tracking-tight text-white">Verifying BuyMesho access</p>
+            <p className="mt-1 text-xs text-white/50">Preparing Ticket Validator...</p>
+          </div>
         </div>
       </div>
     );
@@ -47,7 +52,7 @@ export function ValidatorWorkspace({ controller }: { controller: ValidatorContro
             <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600"><ShieldAlert className="h-5 w-5" /></div>
             <h2 className="mt-4 text-base font-semibold tracking-tight">Access unavailable</h2>
             <p className="mt-2 text-xs leading-5 text-zinc-500">{authError || 'Your BuyMesho account could not be verified.'}</p>
-            <button type="button" onClick={() => { clearToken(); window.location.reload(); }} className="mt-5 min-h-11 w-full rounded-xl bg-zinc-950 px-4 py-3 text-xs font-semibold text-white transition hover:bg-zinc-800">Return to BuyMesho Sign In</button>
+            <button type="button" onClick={() => { clearToken(); window.location.reload(); }} className="mt-5 min-h-11 w-full rounded-xl bg-slate-950 px-4 py-3 text-xs font-semibold text-white transition hover:bg-slate-800">Return to BuyMesho Sign In</button>
           </div>
         </main>
       </div>
