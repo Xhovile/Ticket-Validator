@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_BUYMESHO_API_BASE_URL?.trim() || "https://buymesho.vercel.app";
+const API_BASE_URL = import.meta.env.VITE_BUYMESHO_API_BASE_URL?.trim() || "";
 
 export type ValidatorIdentity = {
   uid: string;
@@ -98,11 +98,21 @@ async function fetchJson<T>(path: string, token: string, init?: RequestInit): Pr
       ...(init?.headers ?? {}),
     },
   });
+
   const payload = await response.json().catch(() => ({}));
+
   if (!response.ok) {
-    const error = (payload && typeof payload === "object" && "error" in payload ? String((payload as { error?: unknown }).error ?? "Request failed") : "Request failed");
-    throw Object.assign(new Error(error), { status: response.status, payload });
+    const error =
+      payload && typeof payload === "object" && "error" in payload
+        ? String((payload as { error?: unknown }).error ?? "Request failed")
+        : "Request failed";
+
+    throw Object.assign(new Error(error), {
+      status: response.status,
+      payload,
+    });
   }
+
   return payload as T;
 }
 
@@ -111,7 +121,10 @@ export async function fetchValidatorMe(token: string) {
 }
 
 export async function fetchValidatorTickets(token: string, eventId: string) {
-  return fetchJson<ValidatorEventTicketsResponse>(`/api/validator/events/${encodeURIComponent(eventId)}/tickets`, token);
+  return fetchJson<ValidatorEventTicketsResponse>(
+    `/api/validator/events/${encodeURIComponent(eventId)}/tickets`,
+    token,
+  );
 }
 
 export async function scanTicket(
@@ -133,7 +146,14 @@ export async function scanTicket(
 
 export async function updateTicketStatus(
   token: string,
-  input: { ticketId: string; eventId: string; status: string; gateName: string; staffName: string; clientSnapshotVersion?: string | null },
+  input: {
+    ticketId: string;
+    eventId: string;
+    status: string;
+    gateName: string;
+    staffName: string;
+    clientSnapshotVersion?: string | null;
+  },
 ) {
   return fetchJson<ScanResponse>("/api/validator/status", token, {
     method: "POST",
@@ -143,7 +163,11 @@ export async function updateTicketStatus(
 
 export async function syncQueuedValidations(
   token: string,
-  input: { queue: Array<any>; eventId: string; clientSnapshotVersion?: string | null },
+  input: {
+    queue: Array<any>;
+    eventId: string;
+    clientSnapshotVersion?: string | null;
+  },
 ) {
   return fetchJson<BulkSyncResult>("/api/validator/sync", token, {
     method: "POST",
