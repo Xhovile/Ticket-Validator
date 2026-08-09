@@ -1,7 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowRight, ExternalLink, LogIn, ScanLine, ShieldCheck, UserPlus } from "lucide-react";
 import ValidatorWorkspace from "../ValidatorWorkspace";
-import { fetchValidatorMe, fetchValidatorTickets, getStoredToken, saveToken, clearToken, TOKEN_KEY } from "../lib/buymeshoApi";
+import {
+  clearToken,
+  fetchValidatorMe,
+  fetchValidatorTickets,
+  getStoredToken,
+  saveToken,
+  TOKEN_KEY,
+} from "../lib/buymeshoApi";
 import type { Ticket } from "../types";
 
 const VALIDATOR_USER_KEY = "buymesho_validator_user";
@@ -21,6 +28,18 @@ function buildRedirectUrl(baseUrl: string, mode: "login" | "signup") {
   return url.toString();
 }
 
+function extractUrlToken() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("token") ?? params.get("access_token") ?? "";
+}
+
+function clearTokenFromUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("token");
+  url.searchParams.delete("access_token");
+  window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+}
+
 function toEventItem(event: any) {
   return {
     id: String(event.id),
@@ -30,12 +49,17 @@ function toEventItem(event: any) {
     date: String(event.event_date ?? ""),
     venue: String(event.venue ?? ""),
     city: String(event.location ?? ""),
-    bannerImage: typeof event.spec_values?.banner_image === "string" ? event.spec_values.banner_image : "https://images.unsplash.com/photo-1470229722913-7c0e2dbb0d7f?w=1200&auto=format&fit=crop&q=80",
+    bannerImage:
+      typeof event.spec_values?.banner_image === "string"
+        ? event.spec_values.banner_image
+        : "https://images.unsplash.com/photo-1470229722913-7c0e2dbb0d7f?w=1200&auto=format&fit=crop&q=80",
     state: event.status === "draft" ? "Upcoming" : event.status === "published" ? "Live" : "Ended",
     totalTicketsSold: Number(event.ticket_count ?? 0),
     checkedInCount: Number(event.checked_in_count ?? 0),
     category: String(event.event_type ?? "Event"),
-    gates: Array.isArray(event.spec_values?.gates) ? event.spec_values.gates.filter((g: unknown): g is string => typeof g === "string") : ["Main Gate"],
+    gates: Array.isArray(event.spec_values?.gates)
+      ? event.spec_values.gates.filter((g: unknown): g is string => typeof g === "string")
+      : ["Main Gate"],
   };
 }
 
@@ -64,23 +88,41 @@ export default function BuyMeshoGateLite() {
   const [authToken, setAuthToken] = useState(() => getStoredToken());
   const [isLoading, setIsLoading] = useState<boolean>(Boolean(getStoredToken()));
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState<boolean>(Boolean(localStorage.getItem(VALIDATOR_USER_KEY)));
+  const [ready, setReady] = useState(false);
 
-  const loginUrl = useMemo(() => buildRedirectUrl(import.meta.env.VITE_BUYMESHO_LOGIN_URL?.trim() || "https://buymesho.vercel.app/login", "login"), []);
-  const signupUrl = useMemo(() => buildRedirectUrl(import.meta.env.VITE_BUYMESHO_SIGNUP_URL?.trim() || "https://buymesho.vercel.app/signup", "signup"), []);
+  const loginUrl = useMemo(
+    () => buildRedirectUrl(import.meta.env.VITE_BUYMESHO_LOGIN_URL?.trim() || "https://buymesho.vercel.app/login", "login"),
+    [],
+  );
+  const signupUrl = useMemo(
+    () => buildRedirectUrl(import.meta.env.VITE_BUYMESHO_SIGNUP_URL?.trim() || "https://buymesho.vercel.app/signup", "signup"),
+    [],
+  );
 
   useEffect(() => {
-    const tokenFromUrl = getStoredToken();
-    if (tokenFromUrl && tokenFromUrl !== authToken) {
-      saveToken(tokenFromUrl);
-      setAuthToken(tokenFromUrl);
+    const urlToken = extractUrlToken();
+    if (urlToken) {
+      saveToken(urlToken);
+      setAuthToken(urlToken);
+      clearTokenFromUrl();
+      return;
     }
-  }, []);
+
+    const storedToken = localStorage.getItem(TOKEN_KEY) || "";
+    if (storedToken && storedToken !== authToken) {
+      setAuthToken(storedToken);
+    }
+  }, [authToken]);
 
   useEffect(() => {
-    if (!authToken) return;
+    if (!authToken) {
+      setIsLoading(false);
+      setReady(false);
+      return;
+    }
 
     let cancelled = false;
+
     void (async () => {
       try {
         setIsLoading(true);
@@ -108,7 +150,7 @@ export default function BuyMeshoGateLite() {
         localStorage.setItem(VALIDATOR_SESSION_KEY, authToken);
         localStorage.setItem(VALIDATOR_EVENTS_KEY, JSON.stringify(events.map(toEventItem)));
         localStorage.setItem(VALIDATOR_TICKETS_KEY, JSON.stringify(Object.values(ticketsByEvent).flat()));
-        localStorage.setItem(TOKEN_KEY, authToken);
+        saveToken(authToken);
 
         if (!cancelled) {
           setReady(true);
@@ -118,8 +160,13 @@ export default function BuyMeshoGateLite() {
       } catch (err) {
         if (!cancelled) {
           clearToken();
-          setError(err instanceof Error ? err.message : "Authentication failed");
+          localStorage.removeItem(VALIDATOR_USER_KEY);
+          localStorage.removeItem(VALIDATOR_SESSION_KEY);
+          localStorage.removeItem(VALIDATOR_EVENTS_KEY);
+          localStorage.removeItem(VALIDATOR_TICKETS_KEY);
+          setAuthToken("");
           setReady(false);
+          setError(err instanceof Error ? err.message : "Authentication failed");
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -149,9 +196,7 @@ export default function BuyMeshoGateLite() {
             </div>
           </div>
 
-          <p className="text-sm leading-6 text-white/70">
-            Only BuyMesho creators and approved gate staff can continue.
-          </p>
+          <p className="text-sm leading-6 text-white/70">Only BuyMesho creators and approved gate staff can continue.</p>
 
           {error && (
             <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
@@ -168,7 +213,10 @@ export default function BuyMeshoGateLite() {
           <div className="mt-5 grid gap-3">
             <button
               type="button"
-              onClick={() => { setError(null); window.location.href = loginUrl; }}
+              onClick={() => {
+                setError(null);
+                window.location.assign(loginUrl);
+              }}
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-white/90"
             >
               <LogIn className="h-4 w-4" />
@@ -178,7 +226,10 @@ export default function BuyMeshoGateLite() {
 
             <button
               type="button"
-              onClick={() => { setError(null); window.location.href = signupUrl; }}
+              onClick={() => {
+                setError(null);
+                window.location.assign(signupUrl);
+              }}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
             >
               <UserPlus className="h-4 w-4" />
