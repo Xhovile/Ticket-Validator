@@ -96,15 +96,12 @@ type SessionExchangeResponse = {
 };
 
 async function requireFreshFirebaseToken() {
-  const user = auth.currentUser;
-  if (!user) {
-    throw Object.assign(new Error('No authenticated Firebase user.'), {
-      status: 401,
-    });
+  if (!auth.currentUser) {
+    throw Object.assign(new Error('No authenticated Firebase user.'), { status: 401 });
   }
 
-  // Firebase handles persistence and token refresh. getIdToken() returns a
-  // valid current ID token and refreshes it automatically when necessary.
+  // Firebase Auth owns the session. getIdToken() automatically refreshes the
+  // ID token when necessary; no application-level token cache is involved.
   return getFreshIdToken();
 }
 
@@ -124,23 +121,18 @@ async function fetchJson<T>(path: string, _unusedToken?: string, init?: RequestI
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const error =
-      payload && typeof payload === "object" && "error" in payload
-        ? String((payload as { error?: unknown }).error ?? "Request failed")
-        : "Request failed";
+    const error = payload && typeof payload === "object" && "error" in payload
+      ? String((payload as { error?: unknown }).error ?? "Request failed")
+      : "Request failed";
 
-    throw Object.assign(new Error(error), {
-      status: response.status,
-      payload,
-    });
+    throw Object.assign(new Error(error), { status: response.status, payload });
   }
 
   return payload as T;
 }
 
-// The callback token is intentionally accepted only for the one-time
-// BuyMesho -> Validator session exchange. It is immediately converted into
-// Firebase Auth state by signInWithCustomToken in BuyMeshoGate.
+// The callback token is used only for the one-time BuyMesho -> Validator
+// exchange. It is never stored as the Validator's client-side session.
 export async function exchangeValidatorSession(token: string) {
   const response = await fetch(`${API_BASE_URL}/api/validator/session`, {
     method: "POST",
@@ -155,15 +147,11 @@ export async function exchangeValidatorSession(token: string) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const error =
-      payload && typeof payload === "object" && "error" in payload
-        ? String((payload as { error?: unknown }).error ?? "Request failed")
-        : "Request failed";
+    const error = payload && typeof payload === "object" && "error" in payload
+      ? String((payload as { error?: unknown }).error ?? "Request failed")
+      : "Request failed";
 
-    throw Object.assign(new Error(error), {
-      status: response.status,
-      payload,
-    });
+    throw Object.assign(new Error(error), { status: response.status, payload });
   }
 
   return payload as SessionExchangeResponse;
@@ -228,12 +216,22 @@ export async function syncQueuedValidations(
   });
 }
 
+// Compatibility helpers for the current application code. These DO NOT hold
+// or return an ID token. They only expose Firebase's current auth state as a
+// truthy marker so existing guards can be migrated without creating a second
+// session authority.
+export function getStoredToken() {
+  return auth.currentUser ? 'firebase-authenticated' : '';
+}
+
+export function saveToken(_token: string) {
+  // Intentionally no-op. Firebase Auth owns session persistence.
+}
+
 export async function signOutValidator() {
   await auth.signOut();
 }
 
 export function clearToken() {
-  // Backward-compatible name for callers during the migration. There is no
-  // client token cache to clear anymore; Firebase Auth owns the session.
   void auth.signOut();
 }
