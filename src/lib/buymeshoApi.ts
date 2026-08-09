@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_BUYMESHO_API_BASE_URL?.trim() || "";
+const API_BASE_URL = "";
 
 export type ValidatorIdentity = {
   uid: string;
