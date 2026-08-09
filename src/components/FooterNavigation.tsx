@@ -27,7 +27,7 @@ export const FooterNavigation: React.FC<FooterNavigationProps> = ({
           disabled
             ? 'cursor-not-allowed text-zinc-300'
             : active
-              ? 'bg-zinc-950 text-white shadow-sm'
+              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20 hover:bg-indigo-600'
               : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
         }`}
       >
@@ -38,7 +38,7 @@ export const FooterNavigation: React.FC<FooterNavigationProps> = ({
   };
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pointer-events-none sm:bottom-4 sm:px-4" aria-label="Primary navigation">
+    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:bottom-4 sm:px-4" aria-label="Primary navigation">
       <div className="pointer-events-auto mx-auto flex w-full max-w-md items-center gap-1 rounded-2xl border border-zinc-200 bg-white/95 p-1.5 shadow-[0_12px_36px_-16px_rgba(0,0,0,0.24)] backdrop-blur-xl">
         {item('events', 'Events', Calendar)}
         <button
@@ -51,8 +51,8 @@ export const FooterNavigation: React.FC<FooterNavigationProps> = ({
             !hasActiveEvent
               ? 'cursor-not-allowed bg-zinc-100 text-zinc-300'
               : currentTab === 'scan'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
-                : 'bg-zinc-950 text-white hover:bg-zinc-800'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/25 hover:bg-indigo-600'
+                : 'bg-[#4F46E5] text-white shadow-sm shadow-indigo-600/20 hover:bg-[#4338CA]'
           }`}
         >
           <ScanLine className="h-[21px] w-[21px]" strokeWidth={2.25} />
