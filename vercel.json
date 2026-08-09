@@ -3,6 +3,10 @@
     {
       "source": "/api/validator/:path*",
       "destination": "https://buymesho.onrender.com/api/validator/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

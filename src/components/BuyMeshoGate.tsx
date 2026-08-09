@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, LogIn, ScanLine, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
-import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { signInWithCustomToken } from 'firebase/auth';
 import App from '../App';
 import { auth } from '../firebase';
+import { useValidatorAuth } from '../auth/ValidatorAuthProvider';
 import { exchangeValidatorSession } from '../lib/buymeshoApi';
 
 const DEFAULT_BUYMESHO_LOGIN_URL = 'https://buymesho.app/login';
@@ -78,8 +79,8 @@ function ActionButton({
 }
 
 export default function BuyMeshoGate() {
-  const [isAuthenticated, setIsAuthenticated] = useState(Boolean(auth.currentUser));
-  const [checkingSession, setCheckingSession] = useState(true);
+  const { state } = useValidatorAuth();
+  const [checkingCallback, setCheckingCallback] = useState(false);
   const [sessionError, setSessionError] = useState('');
 
   const loginUrl = useMemo(
@@ -88,60 +89,51 @@ export default function BuyMeshoGate() {
   );
 
   useEffect(() => {
-    let cancelled = false;
-    let callbackHandled = false;
+    if (state !== 'unauthenticated') return;
+
     const callbackToken = extractCallbackToken();
+    if (!callbackToken) return;
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (cancelled) return;
+    let cancelled = false;
 
-      if (user) {
-        setIsAuthenticated(true);
-        setSessionError('');
-        setCheckingSession(false);
-        return;
+    const exchange = async () => {
+      setCheckingCallback(true);
+      setSessionError('');
+      clearTokenFromUrl();
+
+      try {
+        const response = await exchangeValidatorSession(callbackToken);
+        if (cancelled) return;
+        await signInWithCustomToken(auth, response.customToken);
+      } catch (error) {
+        if (cancelled) return;
+
+        const status = typeof (error as { status?: unknown })?.status === 'number'
+          ? Number((error as { status?: number }).status)
+          : null;
+        const message = error instanceof Error ? error.message : String(error);
+
+        setSessionError(
+          status === 401 || status === 403
+            ? `BuyMesho could not authorize this Ticket Validator session. ${message}`
+            : `Session exchange failed. ${message}`,
+        );
+      } finally {
+        if (!cancelled) setCheckingCallback(false);
       }
+    };
 
-      if (callbackToken && !callbackHandled) {
-        callbackHandled = true;
-        clearTokenFromUrl();
-
-        try {
-          const exchange = await exchangeValidatorSession(callbackToken);
-          if (cancelled) return;
-          await signInWithCustomToken(auth, exchange.customToken);
-          return;
-        } catch (error) {
-          console.error('Unable to exchange the BuyMesho session for Ticket Validator:', error);
-          if (cancelled) return;
-
-          const status = typeof (error as { status?: unknown })?.status === 'number'
-            ? Number((error as { status?: number }).status)
-            : null;
-          const message = error instanceof Error ? error.message : String(error);
-
-          setSessionError(
-            status === 401 || status === 403
-              ? `BuyMesho could not authorize this Ticket Validator session. ${message}`
-              : `Session exchange failed. ${message}`,
-          );
-          setIsAuthenticated(false);
-          setCheckingSession(false);
-          return;
-        }
-      }
-
-      setIsAuthenticated(false);
-      setCheckingSession(false);
-    });
+    void exchange();
 
     return () => {
       cancelled = true;
-      unsubscribe();
     };
-  }, []);
+  }, [state]);
 
-  if (checkingSession) {
+  // Firebase is still restoring browserLocalPersistence. Do not render either
+  // side of the route guard until this resolves: this eliminates the login
+  // screen flash on refresh/reopen.
+  if (state === 'restoring' || checkingCallback) {
     return (
       <div className="min-h-screen bg-slate-950 px-4 text-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-center">
@@ -157,7 +149,10 @@ export default function BuyMeshoGate() {
     );
   }
 
-  if (isAuthenticated && auth.currentUser) return <App />;
+  // This is the only route guard for the Validator workspace. Direct URLs,
+  // refreshes, and browser history all pass through this check because the
+  // application shell is mounted by main.tsx for every SPA path.
+  if (state === 'authenticated' && auth.currentUser) return <App />;
 
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10 text-white">
