@@ -161,8 +161,9 @@ export default function BuyMeshoGate() {
           </div>
 
           <div className="flex items-center justify-between gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/55">
-            <span className="inline-flex items-center gap-2">
-              SIMPLE & SECURE </span>
+            <H2 className="inline-flex items-center gap-2">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              SIMPLE & SECURE </H2>
           </div>
 
           <div className="text-center text-[11px] uppercase tracking-[0.22em] text-white/30">
