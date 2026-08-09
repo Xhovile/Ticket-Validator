@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ExternalLink, LogIn, ScanLine, ShieldCheck, UserPlus } from 'lucide-react';
+import { ArrowRight, LogIn, ScanLine, ShieldCheck } from 'lucide-react';
 import App from '../App';
 import { clearToken, getStoredToken, saveToken } from '../lib/buymeshoApi';
 
@@ -7,11 +7,11 @@ function buildReturnUrl() {
   return `${window.location.origin}${window.location.pathname}`;
 }
 
-function buildRedirectUrl(baseUrl: string, mode: 'login' | 'signup') {
+function buildRedirectUrl(baseUrl: string) {
   const url = new URL(baseUrl);
   url.searchParams.set('returnTo', buildReturnUrl());
   url.searchParams.set('client', 'ticket-validator');
-  url.searchParams.set('mode', mode);
+  url.searchParams.set('mode', 'login');
   return url.toString();
 }
 
@@ -44,14 +44,12 @@ function clearTokenFromUrl() {
 
 function ActionButton({
   href,
-  onClick,
   primary = false,
   icon,
   label,
   caption,
 }: {
-  href?: string;
-  onClick?: () => void;
+  href: string;
   primary?: boolean;
   icon: React.ReactNode;
   label: string;
@@ -61,31 +59,33 @@ function ActionButton({
     ? 'group flex w-full items-start gap-3 rounded-[1.5rem] border border-white/10 bg-white px-4 py-4 text-left text-slate-950 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-slate-50'
     : 'group flex w-full items-start gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-4 text-left text-white transition hover:-translate-y-0.5 hover:bg-white/10';
 
-  const content = (
-    <>
-      <div className={primary ? 'mt-0.5 text-slate-950' : 'mt-0.5 text-white'}>{icon}</div>
+  return (
+    <a href={href} className={className}>
+      <div className={primary ? 'mt-0.5 text-slate-950' : 'mt-0.5 text-white'}>
+        {icon}
+      </div>
+
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-3">
           <span className="text-sm font-semibold tracking-tight">{label}</span>
-          <ArrowRight className={`h-4 w-4 shrink-0 transition group-hover:translate-x-0.5 ${primary ? 'text-slate-950/70' : 'text-white/60'}`} />
+          <ArrowRight
+            className={`h-4 w-4 shrink-0 transition group-hover:translate-x-0.5 ${
+              primary ? 'text-slate-950/70' : 'text-white/60'
+            }`}
+          />
         </div>
-        <p className={primary ? 'mt-1 text-xs leading-5 text-slate-600' : 'mt-1 text-xs leading-5 text-white/60'}>{caption}</p>
+
+        <p
+          className={
+            primary
+              ? 'mt-1 text-xs leading-5 text-slate-600'
+              : 'mt-1 text-xs leading-5 text-white/60'
+          }
+        >
+          {caption}
+        </p>
       </div>
-    </>
-  );
-
-  if (href) {
-    return (
-      <a href={href} className={className}>
-        {content}
-      </a>
-    );
-  }
-
-  return (
-    <button type="button" onClick={onClick} className={className}>
-      {content}
-    </button>
+    </a>
   );
 }
 
@@ -94,16 +94,17 @@ export default function BuyMeshoGate() {
   const [ready, setReady] = useState(() => Boolean(getStoredToken()));
 
   const loginUrl = useMemo(
-    () => buildRedirectUrl(import.meta.env.VITE_BUYMESHO_LOGIN_URL?.trim() || 'https://buymesho.vercel.app/login', 'login'),
-    [],
-  );
-  const signupUrl = useMemo(
-    () => buildRedirectUrl(import.meta.env.VITE_BUYMESHO_SIGNUP_URL?.trim() || 'https://buymesho.vercel.app/signup', 'signup'),
+    () =>
+      buildRedirectUrl(
+        import.meta.env.VITE_BUYMESHO_LOGIN_URL?.trim() ||
+          'https://buymesho.vercel.app/login',
+      ),
     [],
   );
 
   useEffect(() => {
     const token = extractCallbackToken();
+
     if (token) {
       saveToken(token);
       setAuthToken(token);
@@ -113,6 +114,7 @@ export default function BuyMeshoGate() {
     }
 
     const storedToken = getStoredToken();
+
     if (storedToken) {
       setAuthToken(storedToken);
       setReady(true);
@@ -136,26 +138,25 @@ export default function BuyMeshoGate() {
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-950 shadow-lg shadow-black/20">
                 <ScanLine className="h-7 w-7" />
               </div>
+
               <div className="min-w-0 flex-1">
-                <div className="text-[10px] uppercase tracking-[0.35em] text-white/45">BuyMesho</div>
-                <h1 className="mt-1 text-3xl font-semibold tracking-tight">Ticket Validator</h1>
+                <div className="text-[10px] uppercase tracking-[0.35em] text-white/45">
+                  BuyMesho
+                </div>
+
+                <h1 className="mt-1 text-3xl font-semibold tracking-tight">
+                  Ticket Validator
+                </h1>
               </div>
             </div>
 
-            <div className="mt-6 grid gap-3">
+            <div className="mt-6">
               <ActionButton
                 href={loginUrl}
                 primary
                 icon={<LogIn className="h-5 w-5" />}
                 label="Continue with BuyMesho"
-                caption="Use an existing BuyMesho event creator account."
-              />
-
-              <ActionButton
-                href={signupUrl}
-                icon={<UserPlus className="h-5 w-5" />}
-                label="Create BuyMesho access"
-                caption="Register a new event creator account in BuyMesho."
+                caption="Use your existing BuyMesho event creator account."
               />
             </div>
           </div>
