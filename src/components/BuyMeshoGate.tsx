@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, LogIn, ScanLine, ShieldCheck, Loader2 } from 'lucide-react';
+import { ArrowRight, LogIn, ScanLine, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
 import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import App from '../App';
 import { auth } from '../firebase';
@@ -9,6 +9,8 @@ import {
   getStoredToken,
   saveToken,
 } from '../lib/buymeshoApi';
+
+const DEFAULT_BUYMESHO_LOGIN_URL = 'https://buymesho.app/login';
 
 function buildReturnUrl() {
   return `${window.location.origin}${window.location.pathname}`;
@@ -100,12 +102,12 @@ export default function BuyMeshoGate() {
   const [authToken, setAuthToken] = useState(() => getStoredToken());
   const [ready, setReady] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [sessionError, setSessionError] = useState('');
 
   const loginUrl = useMemo(
     () =>
       buildRedirectUrl(
-        import.meta.env.VITE_BUYMESHO_LOGIN_URL?.trim() ||
-          'https://buymesho.vercel.app/login',
+        import.meta.env.VITE_BUYMESHO_LOGIN_URL?.trim() || DEFAULT_BUYMESHO_LOGIN_URL,
       ),
     [],
   );
@@ -119,43 +121,60 @@ export default function BuyMeshoGate() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (cancelled) return;
 
-      try {
-        if (callbackToken && !callbackHandled) {
-          callbackHandled = true;
-          clearTokenFromUrl();
-
-          const exchange = await exchangeValidatorSession(callbackToken);
-          if (cancelled) return;
-
-          await signInWithCustomToken(auth, exchange.customToken);
-          return;
-        }
-
-        if (user) {
+      if (user) {
+        try {
           const token = await user.getIdToken();
           if (cancelled) return;
 
           saveToken(token);
           setAuthToken(token);
           setReady(true);
+          setSessionError('');
+          setCheckingSession(false);
+        } catch (error) {
+          console.error('Unable to read the existing Ticket Validator session:', error);
+          if (!cancelled) {
+            setSessionError('Your existing session could not be read. Please try again.');
+            setCheckingSession(false);
+          }
+        }
+        return;
+      }
+
+      if (callbackToken && !callbackHandled) {
+        callbackHandled = true;
+        clearTokenFromUrl();
+
+        try {
+          const exchange = await exchangeValidatorSession(callbackToken);
+          if (cancelled) return;
+
+          await signInWithCustomToken(auth, exchange.customToken);
+          return;
+        } catch (error) {
+          console.error('Unable to exchange the BuyMesho session for Ticket Validator:', error);
+          if (cancelled) return;
+
+          const status = typeof (error as { status?: unknown })?.status === 'number'
+            ? Number((error as { status?: number }).status)
+            : null;
+
+          const message =
+            status === 401 || status === 403
+              ? 'BuyMesho could not authorize this Ticket Validator session. Please sign in again.'
+              : 'We could not connect to BuyMesho right now. Your existing authentication has not been cleared. Please try again.';
+
+          setSessionError(message);
+          setReady(false);
           setCheckingSession(false);
           return;
         }
-
-        if (callbackToken && !callbackHandled) return;
-
-        clearToken();
-        setAuthToken('');
-        setReady(false);
-        setCheckingSession(false);
-      } catch (error) {
-        console.error('Unable to restore Ticket Validator session:', error);
-        clearTokenFromUrl();
-        clearToken();
-        setAuthToken('');
-        setReady(false);
-        setCheckingSession(false);
       }
+
+      clearToken();
+      setAuthToken('');
+      setReady(false);
+      setCheckingSession(false);
     });
 
     return () => {
@@ -204,6 +223,13 @@ export default function BuyMeshoGate() {
                 </h1>
               </div>
             </div>
+
+            {sessionError && (
+              <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p className="leading-5">{sessionError}</p>
+              </div>
+            )}
 
             <div className="mt-6">
               <ActionButton
