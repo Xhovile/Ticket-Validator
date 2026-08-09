@@ -222,7 +222,7 @@ export async function exchangeValidatorSession(token: string) {
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const error = payload && typeof payload === "object' && "error" in payload
+      const error = payload && typeof payload === 'object' && "error" in payload
         ? String((payload as { error?: unknown }).error ?? "Request failed")
         : `BuyMesho returned HTTP ${response.status}`;
 
