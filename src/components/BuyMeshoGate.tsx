@@ -118,8 +118,61 @@ export default function BuyMeshoGate() {
 
     const callbackToken = extractCallbackToken();
 
+    const restoreExistingUser = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return false;
+
+      try {
+        const token = await currentUser.getIdToken();
+        if (cancelled) return true;
+
+        saveToken(token);
+        setAuthToken(token);
+        setReady(true);
+        setSessionError('');
+        setCheckingSession(false);
+        return true;
+      } catch (error) {
+        console.error('Unable to read the existing Ticket Validator session:', error);
+        return false;
+      }
+    };
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (cancelled) return;
+
+      if (callbackToken && !callbackHandled) {
+        callbackHandled = true;
+        clearTokenFromUrl();
+
+        try {
+          const exchange = await exchangeValidatorSession(callbackToken);
+          if (cancelled) return;
+
+          await signInWithCustomToken(auth, exchange.customToken);
+          return;
+        } catch (error) {
+          console.error('Unable to exchange the BuyMesho session for Ticket Validator:', error);
+          if (cancelled) return;
+
+          const preserved = await restoreExistingUser();
+          if (preserved || cancelled) return;
+
+          const status = typeof (error as { status?: unknown })?.status === 'number'
+            ? Number((error as { status?: number }).status)
+            : null;
+
+          const message =
+            status === 401 || status === 403
+              ? 'BuyMesho could not authorize this Ticket Validator session. Please sign in again.'
+              : 'We could not connect to BuyMesho right now. Your existing authentication has not been cleared. Please try again.';
+
+          setSessionError(message);
+          setReady(false);
+          setCheckingSession(false);
+          return;
+        }
+      }
 
       if (user) {
         try {
@@ -139,36 +192,6 @@ export default function BuyMeshoGate() {
           }
         }
         return;
-      }
-
-      if (callbackToken && !callbackHandled) {
-        callbackHandled = true;
-        clearTokenFromUrl();
-
-        try {
-          const exchange = await exchangeValidatorSession(callbackToken);
-          if (cancelled) return;
-
-          await signInWithCustomToken(auth, exchange.customToken);
-          return;
-        } catch (error) {
-          console.error('Unable to exchange the BuyMesho session for Ticket Validator:', error);
-          if (cancelled) return;
-
-          const status = typeof (error as { status?: unknown })?.status === 'number'
-            ? Number((error as { status?: number }).status)
-            : null;
-
-          const message =
-            status === 401 || status === 403
-              ? 'BuyMesho could not authorize this Ticket Validator session. Please sign in again.'
-              : 'We could not connect to BuyMesho right now. Your existing authentication has not been cleared. Please try again.';
-
-          setSessionError(message);
-          setReady(false);
-          setCheckingSession(false);
-          return;
-        }
       }
 
       clearToken();
