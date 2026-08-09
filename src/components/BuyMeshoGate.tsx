@@ -118,11 +118,12 @@ export default function BuyMeshoGate() {
           const status = typeof (error as { status?: unknown })?.status === 'number'
             ? Number((error as { status?: number }).status)
             : null;
+          const message = error instanceof Error ? error.message : String(error);
 
           setSessionError(
             status === 401 || status === 403
-              ? 'BuyMesho could not authorize this Ticket Validator session. Please sign in again.'
-              : 'We could not connect to BuyMesho right now. Please try again.',
+              ? `BuyMesho could not authorize this Ticket Validator session. ${message}`
+              : `Session exchange failed. ${message}`,
           );
           setIsAuthenticated(false);
           setCheckingSession(false);
