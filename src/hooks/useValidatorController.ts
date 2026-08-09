@@ -1,12 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import {
-  User,
-  EventItem,
-  Ticket,
-  TicketStatus,
-  ActivityLogEntry,
-  CheckInSession,
-} from '../types';
+import { useState, useEffect } from 'react';
+import { User, EventItem, Ticket, TicketStatus, ActivityLogEntry, CheckInSession } from '../types';
 import { loadStoredLogs, saveStoredLogs, loadStoredSession, saveStoredSession } from '../data/mockData';
 import { soundFX } from '../utils/audio';
 import { getOfflineQueue, enqueueValidation, clearOfflineQueue, QueuedValidation } from '../utils/offlineSyncManager';
@@ -14,6 +7,7 @@ import { fetchValidatorMe, fetchValidatorTickets, getStoredToken, clearToken } f
 import type { NavTab } from '../components/FooterNavigation';
 import { mapValidatorTicket } from '../lib/validatorMappers';
 import { buildValidatorSession } from '../lib/validatorSession';
+import { useValidatorScanner } from './useValidatorScanner';
 
 export function useValidatorController() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -31,6 +25,13 @@ export function useValidatorController() {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isAttendeesLoading, setIsAttendeesLoading] = useState(false);
   const [isHighContrast, setIsHighContrast] = useState<boolean>(() => localStorage.getItem('buymesho_high_contrast') === 'true');
+  const [showSessionModal, setShowSessionModal] = useState(false);
+  const [selectedTicketForDetail, setSelectedTicketForDetail] = useState<Ticket | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(() => navigator.onLine);
+  const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
+  const [offlineQueue, setOfflineQueue] = useState<QueuedValidation[]>(() => getOfflineQueue());
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('sunlight-high-contrast', isHighContrast);
@@ -40,26 +41,6 @@ export function useValidatorController() {
   const toggleHighContrast = () => {
     setIsHighContrast((prev) => !prev);
     soundFX.playClick();
-  };
-
-  const [showSessionModal, setShowSessionModal] = useState(false);
-  const [isContinuousScan, setIsContinuousScan] = useState<boolean>(true);
-  const autoDismissTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastScanThrottleRef = useRef<{ code: string; time: number }>({ code: '', time: 0 });
-  const [activeScanResult, setActiveScanResult] = useState<{ ticket: Ticket; scanTime: string; isDuplicate: boolean; isOfflineQueued?: boolean } | null>(null);
-  const [selectedTicketForDetail, setSelectedTicketForDetail] = useState<Ticket | null>(null);
-  const [isOnline, setIsOnline] = useState<boolean>(() => navigator.onLine);
-  const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
-  const [offlineQueue, setOfflineQueue] = useState<QueuedValidation[]>(() => getOfflineQueue());
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
-
-  const handleDismissResult = () => {
-    if (autoDismissTimerRef.current) {
-      clearTimeout(autoDismissTimerRef.current);
-      autoDismissTimerRef.current = null;
-    }
-    setActiveScanResult(null);
   };
 
   useEffect(() => {
@@ -181,9 +162,9 @@ export function useValidatorController() {
     window.setTimeout(() => setSyncToastMessage(null), 3000);
   };
 
-  const handleOnline = () => setIsOnline(true);
-  const handleOffline = () => setIsOnline(false);
   useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {
@@ -216,11 +197,6 @@ export function useValidatorController() {
     setCurrentTab('scan');
   };
 
-  const scheduleAutoDismiss = (delay: number) => {
-    if (autoDismissTimerRef.current) clearTimeout(autoDismissTimerRef.current);
-    autoDismissTimerRef.current = setTimeout(() => setActiveScanResult(null), delay);
-  };
-
   const updateTicketStatus = (ticketId: string, newStatus: TicketStatus, gateNameOverride?: string, staffNameOverride?: string, timestampOverride?: string, isOfflineAction?: boolean) => {
     const timestamp = timestampOverride || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const gate = gateNameOverride || activeSession?.gateName || 'Main Gate';
@@ -241,17 +217,14 @@ export function useValidatorController() {
       });
       setOfflineQueue(getOfflineQueue());
     }
-    setTickets((previousTickets) => previousTickets.map((ticket) => {
-      if (ticket.id !== ticketId) return ticket;
-      return {
-        ...ticket,
-        status: newStatus,
-        lastCheckedInTime: newStatus === 'Inside' ? timestamp : ticket.lastCheckedInTime,
-        lastCheckedOutTime: newStatus === 'Outside' ? timestamp : ticket.lastCheckedOutTime,
-        lastGateName: gate,
-        lastStaffName: staff,
-      };
-    }));
+    setTickets((previousTickets) => previousTickets.map((ticket) => ticket.id === ticketId ? {
+      ...ticket,
+      status: newStatus,
+      lastCheckedInTime: newStatus === 'Inside' ? timestamp : ticket.lastCheckedInTime,
+      lastCheckedOutTime: newStatus === 'Outside' ? timestamp : ticket.lastCheckedOutTime,
+      lastGateName: gate,
+      lastStaffName: staff,
+    } : ticket));
     if (selectedEvent) {
       setEvents((previousEvents) => previousEvents.map((event) => event.id === selectedEvent.id ? {
         ...event,
@@ -281,37 +254,15 @@ export function useValidatorController() {
     setLogs((previous) => [logEntry, ...previous]);
   };
 
-  const handleScanTicket = (scannedCode: string) => {
-    if (!selectedEvent || !currentUser || !activeSession?.active) return;
-    const now = Date.now();
-    if (lastScanThrottleRef.current.code === scannedCode && now - lastScanThrottleRef.current.time < 1500) return;
-    lastScanThrottleRef.current = { code: scannedCode, time: now };
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const effectiveOffline = !isOnline || isSimulatedOffline;
-    const foundTicket = tickets.find((ticket) => ticket.qrPayload === scannedCode || ticket.id === scannedCode);
-    if (!foundTicket) {
-      soundFX.playError();
-      setActiveScanResult(null);
-      return;
-    }
-    if (foundTicket.status !== 'Waiting Entry') {
-      soundFX.playError();
-      setActiveScanResult({ ticket: foundTicket, scanTime: timestamp, isDuplicate: foundTicket.status === 'Inside', isOfflineQueued: false });
-      scheduleAutoDismiss(2500);
-      return;
-    }
-    soundFX.playSuccess();
-    updateTicketStatus(foundTicket.id, 'Inside', activeSession.gateName, currentUser.name, timestamp, effectiveOffline);
-    const updatedTicket: Ticket = {
-      ...foundTicket,
-      status: 'Inside',
-      lastCheckedInTime: timestamp,
-      lastGateName: activeSession.gateName,
-      lastStaffName: currentUser.name,
-    };
-    setActiveScanResult({ ticket: updatedTicket, scanTime: timestamp, isDuplicate: false, isOfflineQueued: effectiveOffline });
-    scheduleAutoDismiss(1800);
-  };
+  const scanner = useValidatorScanner({
+    selectedEvent,
+    currentUser,
+    activeSession,
+    tickets,
+    isOnline,
+    isSimulatedOffline,
+    updateTicketStatus,
+  });
 
   const handleLogout = () => {
     clearToken();
@@ -336,14 +287,18 @@ export function useValidatorController() {
     currentUser, events, selectedEvent, tickets, logs, activeSession,
     isAuthenticating, authError, isTicketsLoading, currentTab, viewState,
     permissionError, isDetailLoading, isAttendeesLoading, isHighContrast,
-    showSessionModal, isContinuousScan, activeScanResult, selectedTicketForDetail,
+    showSessionModal,
+    isContinuousScan: scanner.isContinuousScan,
+    activeScanResult: scanner.activeScanResult,
+    selectedTicketForDetail,
     isOnline, isSimulatedOffline, offlineQueue, isSyncing, syncToastMessage,
     setCurrentTab, setViewState, setPermissionError, setIsAttendeesLoading,
     setIsSimulatedOffline, setOfflineQueue, setSelectedTicketForDetail,
-    setShowSessionModal, setIsContinuousScan,
-    handleDismissResult, handleSyncNow, handleSelectEvent, handleStartSessionConfirm,
-    handleScanTicket, handleLogout, handleSwitchUser, toggleHighContrast,
-    updateTicketStatus,
+    setShowSessionModal, setIsContinuousScan: scanner.setIsContinuousScan,
+    handleDismissResult: scanner.handleDismissResult,
+    handleSyncNow, handleSelectEvent, handleStartSessionConfirm,
+    handleScanTicket: scanner.handleScanTicket, handleLogout, handleSwitchUser,
+    toggleHighContrast, updateTicketStatus,
   };
 }
 
