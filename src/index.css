@@ -125,7 +125,8 @@ img {
 .bg-blue-600,
 .bg-indigo-600,
 .bg-zinc-950,
-.bg-slate-950 {
+.bg-slate-950,
+.bg-slate-900 {
   background-color: var(--brand-dark-surface) !important;
   color: var(--brand-dark-foreground) !important;
 }
