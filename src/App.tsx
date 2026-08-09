@@ -1,19 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckCircle2 } from 'lucide-react';
-import { User, EventItem, Ticket, TicketStatus, ActivityLogEntry, CheckInSession } from './types';
+import { CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
 import {
-  loadStoredUser,
-  saveStoredUser,
-  loadStoredEvents,
-  saveStoredEvents,
-  loadStoredTickets,
-  saveStoredTickets,
+  User,
+  EventItem,
+  Ticket,
+  TicketStatus,
+  ActivityLogEntry,
+  CheckInSession,
+} from './types';
+
+import {
   loadStoredLogs,
   saveStoredLogs,
   loadStoredSession,
   saveStoredSession,
 } from './data/mockData';
+
 import { soundFX } from './utils/audio';
+
 import {
   getOfflineQueue,
   enqueueValidation,
@@ -21,11 +25,17 @@ import {
   QueuedValidation,
 } from './utils/offlineSyncManager';
 
+import {
+  fetchValidatorMe,
+  fetchValidatorTickets,
+  getStoredToken,
+  clearToken,
+} from './lib/buymeshoApi';
+
 // Components
 import { Header } from './components/Header';
 import { OfflineSyncBanner } from './components/OfflineSyncBanner';
 import { FooterNavigation, NavTab } from './components/FooterNavigation';
-import { LoginView } from './components/LoginView';
 import { EventsView } from './components/EventsView';
 import { EventDetailView } from './components/EventDetailView';
 import { CheckInSessionModal } from './components/CheckInSessionModal';
@@ -34,33 +44,227 @@ import { ScanResultCard } from './components/ScanResultCard';
 import { AttendeesView } from './components/AttendeesView';
 import { TicketDetailModal } from './components/TicketDetailModal';
 
+function getMetadataValue(
+  metadata: Record<string, unknown>,
+  keys: string[],
+  fallback = '',
+) {
+  for (const key of keys) {
+    const value = metadata[key];
+
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+
+    if (typeof value === 'number') {
+      return String(value);
+    }
+  }
+
+  return fallback;
+}
+
+function getMetadataNumber(
+  metadata: Record<string, unknown>,
+  keys: string[],
+  fallback = 0,
+) {
+  for (const key of keys) {
+    const value = metadata[key];
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+
+  return fallback;
+}
+
+function getEventState(
+  eventDate: string,
+  startTime: string,
+  status: string,
+): EventItem['state'] {
+  const normalizedStatus = status.toLowerCase();
+
+  if (
+    normalizedStatus.includes('ended') ||
+    normalizedStatus.includes('completed') ||
+    normalizedStatus.includes('cancelled') ||
+    normalizedStatus.includes('canceled')
+  ) {
+    return 'Ended';
+  }
+
+  const eventDateTime = new Date(`${eventDate}T${startTime}`);
+
+  if (Number.isNaN(eventDateTime.getTime())) {
+    return 'Upcoming';
+  }
+
+  return eventDateTime.getTime() <= Date.now() ? 'Live' : 'Upcoming';
+}
+
+function mapValidatorEvent(event: {
+  id: string;
+  creator_uid: string | null;
+  event_type: string;
+  event_title: string;
+  organizer_name: string;
+  event_date: string;
+  start_time: string;
+  venue: string;
+  location: string;
+  ticket_mode: string;
+  ticket_price: number | null;
+  ticket_link: string | null;
+  description: string;
+  contact_whatsapp: string | null;
+  poster_alt: string | null;
+  spec_values: Record<string, unknown>;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  version: string;
+  ticket_count: number;
+}): EventItem {
+  const checkedInCount = 0;
+
+  return {
+    id: event.id,
+    name: event.event_title,
+    organizerId: event.creator_uid || '',
+    organizerName: event.organizer_name,
+    date: event.event_date,
+    venue: event.venue,
+    city: event.location,
+    bannerImage: event.poster_alt || '',
+    state: getEventState(
+      event.event_date,
+      event.start_time,
+      event.status,
+    ),
+    totalTicketsSold: event.ticket_count || 0,
+    checkedInCount,
+    category: event.event_type || 'Event',
+    gates: ['Main Gate'],
+  };
+}
+
+function mapValidatorTicket(ticket: {
+  id: string;
+  code: string;
+  event_id: string;
+  event_title: string;
+  order_id: string;
+  buyer_id: string;
+  status:
+    | 'Waiting Entry'
+    | 'Inside'
+    | 'Outside'
+    | 'Cancelled'
+    | 'Refunded'
+    | 'Blocked'
+    | 'Duplicate Scan Attempt';
+  order_status: string;
+  payment_status: string | null;
+  updated_at: string;
+  version: string;
+  metadata: Record<string, unknown>;
+}): Ticket {
+  const metadata = ticket.metadata || {};
+
+  return {
+    id: ticket.id,
+    qrPayload: ticket.code,
+    eventId: ticket.event_id,
+    attendeeName: getMetadataValue(
+      metadata,
+      ['attendeeName', 'attendee_name', 'buyerName', 'buyer_name', 'name', 'fullName'],
+      'Ticket Holder',
+    ),
+    attendeeEmail: getMetadataValue(
+      metadata,
+      ['attendeeEmail', 'attendee_email', 'buyerEmail', 'buyer_email', 'email'],
+      '',
+    ),
+    attendeePhone: getMetadataValue(
+      metadata,
+      ['attendeePhone', 'attendee_phone', 'buyerPhone', 'buyer_phone', 'phone'],
+      'N/A',
+    ),
+    ticketTier: getMetadataValue(
+      metadata,
+      ['ticketTier', 'ticket_tier', 'tier', 'ticketType', 'ticket_type'],
+      'General Admission',
+    ),
+    seatOrZone: getMetadataValue(
+      metadata,
+      ['seatOrZone', 'seat_or_zone', 'seat', 'zone'],
+      'General',
+    ),
+    price: getMetadataNumber(
+      metadata,
+      ['price', 'ticketPrice', 'ticket_price', 'amount'],
+      0,
+    ),
+    purchaseDate: getMetadataValue(
+      metadata,
+      ['purchaseDate', 'purchase_date', 'createdAt', 'created_at'],
+      ticket.updated_at,
+    ),
+    status: ticket.status,
+    notes: getMetadataValue(
+      metadata,
+      ['notes', 'note'],
+      '',
+    ),
+  };
+}
+
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => loadStoredUser());
-  const [events, setEvents] = useState<EventItem[]>(() => loadStoredEvents());
-  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(() => {
-    const user = loadStoredUser();
-    const evts = loadStoredEvents();
-    if (!user) return evts[0] || null;
-    const authEvts = evts.filter(e => user.role === 'organizer' ? e.organizerId === user.id : user.assignedEventIds.includes(e.id));
-    return authEvts[0] || null;
-  });
-  const [tickets, setTickets] = useState<Ticket[]>(() => loadStoredTickets());
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [logs, setLogs] = useState<ActivityLogEntry[]>(() => loadStoredLogs());
-  const [activeSession, setActiveSession] = useState<CheckInSession | null>(() => loadStoredSession());
+  const [activeSession, setActiveSession] =
+    useState<CheckInSession | null>(() => loadStoredSession());
+
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isTicketsLoading, setIsTicketsLoading] = useState(false);
 
   // UI Navigation state
   const [currentTab, setCurrentTab] = useState<NavTab>('events');
-  const [viewState, setViewState] = useState<'list' | 'detail'>('list');
-  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [viewState, setViewState] =
+    useState<'list' | 'detail'>('list');
+
+  const [permissionError, setPermissionError] =
+    useState<string | null>(null);
+
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isAttendeesLoading, setIsAttendeesLoading] = useState(false);
+
   const [isHighContrast, setIsHighContrast] = useState<boolean>(() => {
     return localStorage.getItem('buymesho_high_contrast') === 'true';
   });
 
   useEffect(() => {
-    document.documentElement.classList.toggle('sunlight-high-contrast', isHighContrast);
-    localStorage.setItem('buymesho_high_contrast', String(isHighContrast));
+    document.documentElement.classList.toggle(
+      'sunlight-high-contrast',
+      isHighContrast,
+    );
+
+    localStorage.setItem(
+      'buymesho_high_contrast',
+      String(isHighContrast),
+    );
   }, [isHighContrast]);
 
   const toggleHighContrast = () => {
@@ -70,9 +274,18 @@ export default function App() {
 
   // Modals & Active Overlays
   const [showSessionModal, setShowSessionModal] = useState(false);
-  const [isContinuousScan, setIsContinuousScan] = useState<boolean>(true);
+  const [isContinuousScan, setIsContinuousScan] =
+    useState<boolean>(true);
+
   const autoDismissTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastScanThrottleRef = useRef<{ code: string; time: number }>({ code: '', time: 0 });
+
+  const lastScanThrottleRef = useRef<{
+    code: string;
+    time: number;
+  }>({
+    code: '',
+    time: 0,
+  });
 
   const [activeScanResult, setActiveScanResult] = useState<{
     ticket: Ticket;
@@ -86,53 +299,301 @@ export default function App() {
       clearTimeout(autoDismissTimerRef.current);
       autoDismissTimerRef.current = null;
     }
+
     setActiveScanResult(null);
   };
-  const [selectedTicketForDetail, setSelectedTicketForDetail] = useState<Ticket | null>(null);
+
+  const [selectedTicketForDetail, setSelectedTicketForDetail] =
+    useState<Ticket | null>(null);
 
   // Offline & Background Sync state
-  const [isOnline, setIsOnline] = useState<boolean>(() => navigator.onLine);
-  const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
-  const [offlineQueue, setOfflineQueue] = useState<QueuedValidation[]>(() => getOfflineQueue());
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(
+    () => navigator.onLine,
+  );
 
+  const [isSimulatedOffline, setIsSimulatedOffline] =
+    useState<boolean>(false);
+
+  const [offlineQueue, setOfflineQueue] =
+    useState<QueuedValidation[]>(() => getOfflineQueue());
+
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncToastMessage, setSyncToastMessage] =
+    useState<string | null>(null);
+
+  /*
+   * ---------------------------------------------------------
+   * BUYMESHO AUTHENTICATION
+   * ---------------------------------------------------------
+   *
+   * BuyMeshoGate has already validated that we have a BuyMesho
+   * session token before rendering this component.
+   *
+   * App therefore MUST NOT show another login screen.
+   *
+   * The token is verified by /api/validator/me.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    const authenticateWithBuyMesho = async () => {
+      const token = getStoredToken();
+
+      if (!token) {
+        if (!cancelled) {
+          setAuthError('Your BuyMesho session is missing.');
+          setIsAuthenticating(false);
+        }
+        return;
+      }
+
+      try {
+        setIsAuthenticating(true);
+        setAuthError(null);
+
+        const response = await fetchValidatorMe(token);
+
+        if (cancelled) return;
+
+        if (!response.access_scope?.can_validate_tickets) {
+          setAuthError(
+            'Your BuyMesho account does not have permission to validate tickets.',
+          );
+          setIsAuthenticating(false);
+          return;
+        }
+
+        const identity = response.identity;
+        const accessScope = response.access_scope;
+
+        const authorizedEventIds =
+          accessScope.allowed_event_ids?.length
+            ? accessScope.allowed_event_ids
+            : response.events.map((event) => event.id);
+
+        const isOrganizer =
+          Boolean(response.creator) ||
+          accessScope.role === 'admin' ||
+          Boolean(accessScope.is_admin) ||
+          Boolean(identity.is_admin);
+
+        const user: User = {
+          id: identity.uid,
+          name:
+            identity.display_name ||
+            identity.email ||
+            'BuyMesho User',
+          email: identity.email || '',
+          role: isOrganizer ? 'organizer' : 'gate_staff',
+          assignedEventIds: authorizedEventIds,
+          assignedGate: undefined,
+        };
+
+        const mappedEvents = response.events
+          .map(mapValidatorEvent)
+          .filter((event) =>
+            authorizedEventIds.includes(event.id),
+          );
+
+        setCurrentUser(user);
+        setEvents(mappedEvents);
+
+        const storedSession = loadStoredSession();
+
+        const validStoredSession =
+          storedSession &&
+          mappedEvents.some(
+            (event) => event.id === storedSession.eventId,
+          )
+            ? storedSession
+            : null;
+
+        setActiveSession(validStoredSession);
+
+        setSelectedEvent(
+          mappedEvents.find(
+            (event) => event.id === validStoredSession?.eventId,
+          ) ||
+            mappedEvents[0] ||
+            null,
+        );
+
+        if (!validStoredSession) {
+          setCurrentTab('events');
+          setViewState('list');
+        }
+
+        setIsAuthenticating(false);
+      } catch (error: any) {
+        if (cancelled) return;
+
+        if (error?.status === 401 || error?.status === 403) {
+          clearToken();
+
+          setAuthError(
+            'Your BuyMesho session is no longer valid or does not have Ticket Validator access.',
+          );
+        } else {
+          setAuthError(
+            error?.message ||
+              'Unable to verify your BuyMesho account. Please try again.',
+          );
+        }
+
+        setCurrentUser(null);
+        setEvents([]);
+        setSelectedEvent(null);
+        setTickets([]);
+        setIsAuthenticating(false);
+      }
+    };
+
+    authenticateWithBuyMesho();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /*
+   * ---------------------------------------------------------
+   * LOAD EVENT TICKETS
+   * ---------------------------------------------------------
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTickets = async () => {
+      if (!selectedEvent) {
+        setTickets([]);
+        return;
+      }
+
+      const token = getStoredToken();
+
+      if (!token) {
+        setTickets([]);
+        return;
+      }
+
+      try {
+        setIsTicketsLoading(true);
+
+        const response = await fetchValidatorTickets(
+          token,
+          selectedEvent.id,
+        );
+
+        if (cancelled) return;
+
+        const mappedTickets = response.tickets.map(
+          mapValidatorTicket,
+        );
+
+        setTickets(mappedTickets);
+
+        setEvents((previousEvents) =>
+          previousEvents.map((event) =>
+            event.id === selectedEvent.id
+              ? {
+                  ...event,
+                  totalTicketsSold: mappedTickets.length,
+                  checkedInCount: mappedTickets.filter(
+                    (ticket) => ticket.status === 'Inside',
+                  ).length,
+                }
+              : event,
+          ),
+        );
+      } catch (error: any) {
+        if (cancelled) return;
+
+        if (error?.status === 401 || error?.status === 403) {
+          clearToken();
+          setAuthError(
+            'Your BuyMesho session has expired. Please sign in again.',
+          );
+          setCurrentUser(null);
+        } else {
+          setPermissionError(
+            error?.message ||
+              'Unable to load tickets for this event.',
+          );
+        }
+
+        setTickets([]);
+      } finally {
+        if (!cancelled) {
+          setIsTicketsLoading(false);
+        }
+      }
+    };
+
+    loadTickets();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEvent?.id]);
+
+  /*
+   * ---------------------------------------------------------
+   * OFFLINE SYNC
+   * ---------------------------------------------------------
+   */
   const handleSyncNow = async () => {
     const queue = getOfflineQueue();
+
     if (queue.length === 0) return;
+
     setIsSyncing(true);
 
-    // Simulate background network sync with BuyMesho server
-    await new Promise((res) => setTimeout(res, 800));
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
     const count = queue.length;
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const timestamp = new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
 
     const syncLog: ActivityLogEntry = {
       id: `log-${Date.now()}`,
       timestamp,
-      eventId: selectedEvent?.id || 'evt-neon-2026',
+      eventId: selectedEvent?.id || '',
       action: 'Checked In (Inside)',
       gateName: activeSession?.gateName || 'Main Gate',
       staffName: currentUser?.name || 'Gate Officer',
       statusBadge: 'success',
-      details: `Background Sync: ${count} offline ticket validation${count > 1 ? 's' : ''} synced with server`,
+      details: `Background Sync: ${count} offline ticket validation${
+        count > 1 ? 's' : ''
+      } synced with BuyMesho server`,
     };
 
-    setLogs((prev) => [syncLog, ...prev]);
+    setLogs((previous) => [syncLog, ...previous]);
+
     clearOfflineQueue();
     setOfflineQueue([]);
     setIsSyncing(false);
+
     soundFX.playSuccess();
 
-    setSyncToastMessage(`Successfully synced ${count} offline ticket validation${count > 1 ? 's' : ''} with BuyMesho server!`);
+    setSyncToastMessage(
+      `Successfully synced ${count} offline ticket validation${
+        count > 1 ? 's' : ''
+      } with BuyMesho server!`,
+    );
+
     setTimeout(() => setSyncToastMessage(null), 4000);
   };
 
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
+
       const queue = getOfflineQueue();
+
       if (queue.length > 0) {
         handleSyncNow();
       }
@@ -147,15 +608,27 @@ export default function App() {
 
     if ('serviceWorker' in navigator) {
       const messageHandler = (event: MessageEvent) => {
-        if (event.data && event.data.type === 'BACKGROUND_SYNC_TRIGGERED') {
+        if (
+          event.data &&
+          event.data.type === 'BACKGROUND_SYNC_TRIGGERED'
+        ) {
           handleSyncNow();
         }
       };
-      navigator.serviceWorker.addEventListener('message', messageHandler);
+
+      navigator.serviceWorker.addEventListener(
+        'message',
+        messageHandler,
+      );
+
       return () => {
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
-        navigator.serviceWorker.removeEventListener('message', messageHandler);
+
+        navigator.serviceWorker.removeEventListener(
+          'message',
+          messageHandler,
+        );
       };
     }
 
@@ -165,19 +638,6 @@ export default function App() {
     };
   }, []);
 
-  // Save states to localStorage whenever they mutate
-  useEffect(() => {
-    if (currentUser) saveStoredUser(currentUser);
-  }, [currentUser]);
-
-  useEffect(() => {
-    saveStoredEvents(events);
-  }, [events]);
-
-  useEffect(() => {
-    saveStoredTickets(tickets);
-  }, [tickets]);
-
   useEffect(() => {
     saveStoredLogs(logs);
   }, [logs]);
@@ -186,36 +646,54 @@ export default function App() {
     saveStoredSession(activeSession);
   }, [activeSession]);
 
-  // Auth Handlers
-  const handleLogin = (user: User) => {
-    setCurrentUser(user);
-    setPermissionError(null);
-    const userEvts = events.filter(e => user.role === 'organizer' ? e.organizerId === user.id : user.assignedEventIds.includes(e.id));
-    setSelectedEvent(userEvts[0] || null);
-    soundFX.playSuccess();
-  };
-
+  /*
+   * ---------------------------------------------------------
+   * LOGOUT
+   * ---------------------------------------------------------
+   */
   const handleLogout = () => {
+    clearToken();
     setCurrentUser(null);
     setActiveSession(null);
     saveStoredSession(null);
     soundFX.playClick();
+
+    window.location.reload();
   };
 
+  /*
+   * Header still expects this callback because the existing
+   * Header component supports demo-account switching.
+   *
+   * Production authentication comes from BuyMesho, so this
+   * simply replaces the local identity if the component ever
+   * invokes it.
+   */
   const handleSwitchUser = (newUser: User) => {
     setCurrentUser(newUser);
     setPermissionError(null);
-    const userEvts = events.filter(e => newUser.role === 'organizer' ? e.organizerId === newUser.id : newUser.assignedEventIds.includes(e.id));
-    setSelectedEvent(userEvts[0] || null);
+
+    const userEvents = events.filter((event) =>
+      newUser.role === 'organizer'
+        ? event.organizerId === newUser.id
+        : newUser.assignedEventIds.includes(event.id),
+    );
+
+    setSelectedEvent(userEvents[0] || null);
+    setViewState('list');
+    setCurrentTab('events');
+
     soundFX.playClick();
   };
 
-  // Event Selection & Permissions Guard
+  /*
+   * ---------------------------------------------------------
+   * EVENT SELECTION
+   * ---------------------------------------------------------
+   */
   const handleSelectEvent = (event: EventItem) => {
     if (!currentUser) return;
 
-    // Check permissions requirement:
-    // Only allow access to events owned by the organizer or explicitly granted to them
     const hasPermission =
       currentUser.role === 'organizer'
         ? event.organizerId === currentUser.id
@@ -223,9 +701,11 @@ export default function App() {
 
     if (!hasPermission) {
       soundFX.playError();
+
       setPermissionError(
-        `Permission Denied: Account '${currentUser.name}' does not have gate scanning authorization for '${event.name}'. Contact event organizer on BuyMesho.`
+        `Permission denied. Your BuyMesho account does not have gate scanning authorization for "${event.name}". Contact the event organizer on BuyMesho.`,
       );
+
       return;
     }
 
@@ -233,19 +713,30 @@ export default function App() {
     setSelectedEvent(event);
     setViewState('detail');
     setIsDetailLoading(true);
+
     setTimeout(() => setIsDetailLoading(false), 300);
+
     soundFX.playClick();
   };
 
-  // Start Check-in Session
-  const handleStartSessionConfirm = (session: CheckInSession) => {
+  /*
+   * ---------------------------------------------------------
+   * START CHECK-IN SESSION
+   * ---------------------------------------------------------
+   */
+  const handleStartSessionConfirm = (
+    session: CheckInSession,
+  ) => {
     setActiveSession(session);
     setShowSessionModal(false);
 
-    // Create log
     const newLog: ActivityLogEntry = {
       id: `log-${Date.now()}`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
       eventId: session.eventId,
       action: 'Check-in Session Started',
       gateName: session.gateName,
@@ -254,20 +745,28 @@ export default function App() {
       details: `Gate scan session initialized for ${session.gateName}`,
     };
 
-    setLogs((prev) => [newLog, ...prev]);
+    setLogs((previous) => [newLog, ...previous]);
     setCurrentTab('scan');
+
     soundFX.playSuccess();
   };
 
-  // Scanning Core Logic
+  /*
+   * ---------------------------------------------------------
+   * SCANNING
+   * ---------------------------------------------------------
+   */
   const handleScanTicket = (scannedCode: string) => {
-    if (!selectedEvent || !currentUser || !activeSession) return;
+    if (!selectedEvent || !currentUser || !activeSession) {
+      return;
+    }
 
     const now = Date.now();
     const cleanCode = scannedCode.trim().toLowerCase();
-    const effectiveOffline = !isOnline || isSimulatedOffline;
 
-    // Throttle identical code scans within 1.5s when in continuous scan mode
+    const effectiveOffline =
+      !isOnline || isSimulatedOffline;
+
     if (
       isContinuousScan &&
       lastScanThrottleRef.current.code === cleanCode &&
@@ -275,18 +774,26 @@ export default function App() {
     ) {
       return;
     }
-    lastScanThrottleRef.current = { code: cleanCode, time: now };
 
-    // Clear any previous auto-dismiss timer
+    lastScanThrottleRef.current = {
+      code: cleanCode,
+      time: now,
+    };
+
     if (autoDismissTimerRef.current) {
       clearTimeout(autoDismissTimerRef.current);
       autoDismissTimerRef.current = null;
     }
 
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const timestamp = new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
 
-    // Schedule helper for continuous mode auto dismissal
-    const scheduleAutoDismiss = (delayMs: number = 1800) => {
+    const scheduleAutoDismiss = (
+      delayMs: number = 1800,
+    ) => {
       if (isContinuousScan) {
         autoDismissTimerRef.current = setTimeout(() => {
           setActiveScanResult(null);
@@ -295,16 +802,16 @@ export default function App() {
       }
     };
 
-    // Find ticket by QR payload or Ticket ID
     const foundTicket = tickets.find(
-      (t) =>
-        t.eventId === selectedEvent.id &&
-        (t.qrPayload.toLowerCase() === cleanCode || t.id.toLowerCase() === cleanCode)
+      (ticket) =>
+        ticket.eventId === selectedEvent.id &&
+        (ticket.qrPayload.toLowerCase() === cleanCode ||
+          ticket.id.toLowerCase() === cleanCode),
     );
 
     if (!foundTicket) {
       soundFX.playError();
-      // Record failed scan log
+
       const failLog: ActivityLogEntry = {
         id: `log-${Date.now()}`,
         timestamp,
@@ -315,15 +822,16 @@ export default function App() {
         statusBadge: 'danger',
         details: `Invalid ticket QR payload: ${scannedCode}`,
       };
-      setLogs((prev) => [failLog, ...prev]);
 
-      // Show mock unknown ticket result card
+      setLogs((previous) => [failLog, ...previous]);
+
       const unknownTicket: Ticket = {
         id: scannedCode.toUpperCase(),
         qrPayload: scannedCode,
         eventId: selectedEvent.id,
-        attendeeName: 'Unknown Attendee / Unrecognized Ticket',
-        attendeeEmail: 'unknown@example.com',
+        attendeeName:
+          'Unknown Attendee / Unrecognized Ticket',
+        attendeeEmail: '',
         attendeePhone: 'N/A',
         ticketTier: 'Invalid Barcode',
         price: 0,
@@ -337,18 +845,25 @@ export default function App() {
         scanTime: timestamp,
         isDuplicate: false,
       });
+
       scheduleAutoDismiss(2500);
+
       return;
     }
 
-    // Ticket found! Increment session count
-    setActiveSession((prev) => (prev ? { ...prev, scanCount: prev.scanCount + 1 } : null));
+    setActiveSession((previous) =>
+      previous
+        ? {
+            ...previous,
+            scanCount: previous.scanCount + 1,
+          }
+        : null,
+    );
 
-    // Handle ticket state checks
     if (foundTicket.status === 'Inside') {
-      // Duplicate scan warning!
       soundFX.playWarning();
-      const dupLog: ActivityLogEntry = {
+
+      const duplicateLog: ActivityLogEntry = {
         id: `log-${Date.now()}`,
         timestamp,
         eventId: selectedEvent.id,
@@ -358,19 +873,33 @@ export default function App() {
         gateName: activeSession.gateName,
         staffName: currentUser.name,
         statusBadge: 'warning',
-        details: 'Attempted scan of ticket already checked inside venue',
+        details:
+          'Attempted scan of ticket already checked inside venue',
       };
-      setLogs((prev) => [dupLog, ...prev]);
+
+      setLogs((previous) => [
+        duplicateLog,
+        ...previous,
+      ]);
 
       setActiveScanResult({
         ticket: foundTicket,
         scanTime: timestamp,
         isDuplicate: true,
       });
+
       scheduleAutoDismiss(2200);
-    } else if (foundTicket.status === 'Cancelled' || foundTicket.status === 'Refunded' || foundTicket.status === 'Blocked') {
-      // Invalid status scan
+
+      return;
+    }
+
+    if (
+      foundTicket.status === 'Cancelled' ||
+      foundTicket.status === 'Refunded' ||
+      foundTicket.status === 'Blocked'
+    ) {
       soundFX.playError();
+
       const invalidLog: ActivityLogEntry = {
         id: `log-${Date.now()}`,
         timestamp,
@@ -383,99 +912,172 @@ export default function App() {
         statusBadge: 'danger',
         details: `Ticket status is ${foundTicket.status}`,
       };
-      setLogs((prev) => [invalidLog, ...prev]);
+
+      setLogs((previous) => [
+        invalidLog,
+        ...previous,
+      ]);
 
       setActiveScanResult({
         ticket: foundTicket,
         scanTime: timestamp,
         isDuplicate: false,
       });
+
       scheduleAutoDismiss(2500);
-    } else {
-      // Valid entry! Auto-check inside
-      soundFX.playSuccess();
-      updateTicketStatus(foundTicket.id, 'Inside', activeSession.gateName, currentUser.name, timestamp, effectiveOffline);
 
-      const updatedTicket: Ticket = {
-        ...foundTicket,
-        status: 'Inside',
-        lastCheckedInTime: timestamp,
-        lastGateName: activeSession.gateName,
-        lastStaffName: currentUser.name,
-      };
-
-      setActiveScanResult({
-        ticket: updatedTicket,
-        scanTime: timestamp,
-        isDuplicate: false,
-        isOfflineQueued: effectiveOffline,
-      });
-      scheduleAutoDismiss(1800);
+      return;
     }
+
+    soundFX.playSuccess();
+
+    updateTicketStatus(
+      foundTicket.id,
+      'Inside',
+      activeSession.gateName,
+      currentUser.name,
+      timestamp,
+      effectiveOffline,
+    );
+
+    const updatedTicket: Ticket = {
+      ...foundTicket,
+      status: 'Inside',
+      lastCheckedInTime: timestamp,
+      lastGateName: activeSession.gateName,
+      lastStaffName: currentUser.name,
+    };
+
+    setActiveScanResult({
+      ticket: updatedTicket,
+      scanTime: timestamp,
+      isDuplicate: false,
+      isOfflineQueued: effectiveOffline,
+    });
+
+    scheduleAutoDismiss(1800);
   };
 
-  // Status Updater Function
+  /*
+   * ---------------------------------------------------------
+   * LOCAL TICKET STATE
+   * ---------------------------------------------------------
+   */
   const updateTicketStatus = (
     ticketId: string,
     newStatus: TicketStatus,
     gateNameOverride?: string,
     staffNameOverride?: string,
     timestampOverride?: string,
-    isOfflineAction?: boolean
+    isOfflineAction?: boolean,
   ) => {
-    const timestamp = timestampOverride || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const gate = gateNameOverride || activeSession?.gateName || 'Main Gate';
-    const staff = staffNameOverride || currentUser?.name || 'Gate Officer';
-    const effectiveOffline = isOfflineAction !== undefined ? isOfflineAction : (!isOnline || isSimulatedOffline);
+    const timestamp =
+      timestampOverride ||
+      new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
 
-    const targetTicket = tickets.find((t) => t.id === ticketId);
+    const gate =
+      gateNameOverride ||
+      activeSession?.gateName ||
+      'Main Gate';
+
+    const staff =
+      staffNameOverride ||
+      currentUser?.name ||
+      'Gate Officer';
+
+    const effectiveOffline =
+      isOfflineAction !== undefined
+        ? isOfflineAction
+        : !isOnline || isSimulatedOffline;
+
+    const targetTicket = tickets.find(
+      (ticket) => ticket.id === ticketId,
+    );
+
     if (targetTicket && effectiveOffline) {
       enqueueValidation({
         ticketId,
         eventId: targetTicket.eventId,
         attendeeName: targetTicket.attendeeName,
         ticketTier: targetTicket.ticketTier,
-        actionType: newStatus === 'Inside' ? 'check_in' : 'status_change',
+        actionType:
+          newStatus === 'Inside'
+            ? 'check_in'
+            : 'status_change',
         newStatus,
         previousStatus: targetTicket.status,
         gateName: gate,
         staffName: staff,
       });
+
       setOfflineQueue(getOfflineQueue());
     }
 
-    setTickets((prev) =>
-      prev.map((t) => {
-        if (t.id === ticketId) {
-          const oldStatus = t.status;
-
-          // Update Event Checked-in Counter
-          if (oldStatus !== 'Inside' && newStatus === 'Inside') {
-            setEvents((evts) =>
-              evts.map((e) => (e.id === t.eventId ? { ...e, checkedInCount: e.checkedInCount + 1 } : e))
-            );
-          } else if (oldStatus === 'Inside' && newStatus !== 'Inside') {
-            setEvents((evts) =>
-              evts.map((e) => (e.id === t.eventId ? { ...e, checkedInCount: Math.max(0, e.checkedInCount - 1) } : e))
-            );
-          }
-
-          return {
-            ...t,
-            status: newStatus,
-            lastCheckedInTime: newStatus === 'Inside' ? timestamp : t.lastCheckedInTime,
-            lastCheckedOutTime: newStatus === 'Outside' ? timestamp : t.lastCheckedOutTime,
-            lastGateName: gate,
-            lastStaffName: staff,
-          };
+    setTickets((previousTickets) =>
+      previousTickets.map((ticket) => {
+        if (ticket.id !== ticketId) {
+          return ticket;
         }
-        return t;
-      })
+
+        return {
+          ...ticket,
+          status: newStatus,
+          lastCheckedInTime:
+            newStatus === 'Inside'
+              ? timestamp
+              : ticket.lastCheckedInTime,
+          lastCheckedOutTime:
+            newStatus === 'Outside'
+              ? timestamp
+              : ticket.lastCheckedOutTime,
+          lastGateName: gate,
+          lastStaffName: staff,
+        };
+      }),
     );
 
-    // Add activity log entry
-    let actionType: ActivityLogEntry['action'] = 'Checked In (Inside)';
-    let badge: ActivityLogEntry['statusBadge'] = 'success';
+    setEvents((previousEvents) =>
+      previousEvents.map((event) => {
+        if (!targetTicket || event.id !== targetTicket.eventId) {
+          return event;
+        }
+
+        const wasInside =
+          targetTicket.status === 'Inside';
+
+        const willBeInside =
+          newStatus === 'Inside';
+
+        let checkedInCount =
+          event.checkedInCount;
+
+        if (!wasInside && willBeInside) {
+          checkedInCount += 1;
+        }
+
+        if (wasInside && !willBeInside) {
+          checkedInCount = Math.max(
+            0,
+            checkedInCount - 1,
+          );
+        }
+
+        return {
+          ...event,
+          checkedInCount,
+        };
+      }),
+    );
+
+    let actionType: ActivityLogEntry['action'] =
+      'Checked In (Inside)';
+
+    let badge: ActivityLogEntry['statusBadge'] =
+      'success';
 
     if (newStatus === 'Inside') {
       actionType = 'Checked In (Inside)';
@@ -500,23 +1102,58 @@ export default function App() {
     const logEntry: ActivityLogEntry = {
       id: `log-${Date.now()}`,
       timestamp,
-      eventId: selectedEvent?.id || 'evt-neon-2026',
+      eventId: selectedEvent?.id || '',
       ticketId,
       attendeeName: targetTicket?.attendeeName,
       action: actionType,
       gateName: gate,
       staffName: staff,
       statusBadge: badge,
-      details: effectiveOffline ? 'Validated Offline (Queued for Sync)' : `Gate action: Ticket status updated to ${newStatus}`,
+      details: effectiveOffline
+        ? 'Validated Offline (Queued for Sync)'
+        : `Gate action: Ticket status updated to ${newStatus}`,
     };
 
-    setLogs((prev) => [logEntry, ...prev]);
+    setLogs((previous) => [
+      logEntry,
+      ...previous,
+    ]);
   };
 
-  // If not logged in, show Login view
-  if (!currentUser) {
+  /*
+   * ---------------------------------------------------------
+   * AUTHENTICATION LOADING SCREEN
+   * ---------------------------------------------------------
+   */
+  if (isAuthenticating) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-blue-600 selection:text-white">
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center px-6">
+        <div className="flex flex-col items-center text-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-lg">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold">
+              Verifying BuyMesho access
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Preparing Ticket Validator...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /*
+   * ---------------------------------------------------------
+   * AUTHENTICATION ERROR
+   * ---------------------------------------------------------
+   */
+  if (authError || !currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900">
         <Header
           user={null}
           onLogout={handleLogout}
@@ -525,8 +1162,33 @@ export default function App() {
           isHighContrast={isHighContrast}
           onToggleHighContrast={toggleHighContrast}
         />
-        <main>
-          <LoginView onLogin={handleLogin} />
+
+        <main className="min-h-[75vh] flex items-center justify-center px-6">
+          <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+              <ShieldAlert className="h-6 w-6" />
+            </div>
+
+            <h2 className="mt-4 text-lg font-semibold">
+              Access unavailable
+            </h2>
+
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              {authError ||
+                'Your BuyMesho account could not be verified.'}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => {
+                clearToken();
+                window.location.reload();
+              }}
+              className="mt-5 min-h-[44px] w-full rounded-xl bg-slate-950 px-4 py-3 text-xs font-semibold text-white transition hover:bg-slate-800"
+            >
+              Return to BuyMesho Sign In
+            </button>
+          </div>
         </main>
       </div>
     );
@@ -534,7 +1196,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
-      {/* Header */}
       <Header
         user={currentUser}
         onLogout={handleLogout}
@@ -545,13 +1206,14 @@ export default function App() {
         onToggleHighContrast={toggleHighContrast}
       />
 
-      {/* Offline & Background Sync Banner */}
       <OfflineSyncBanner
         isOnline={isOnline}
         isSimulatedOffline={isSimulatedOffline}
         queuedItems={offlineQueue}
         isSyncing={isSyncing}
-        onToggleSimulatedOffline={() => setIsSimulatedOffline((prev) => !prev)}
+        onToggleSimulatedOffline={() =>
+          setIsSimulatedOffline((previous) => !previous)
+        }
         onSyncNow={handleSyncNow}
         onClearQueue={() => {
           clearOfflineQueue();
@@ -559,7 +1221,6 @@ export default function App() {
         }}
       />
 
-      {/* Sync Notification Toast */}
       {syncToastMessage && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-bold border border-emerald-400 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-4 h-4 text-white" />
@@ -567,7 +1228,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Main View Container */}
       <main className="transition-all duration-200">
         {currentTab === 'events' && (
           <>
@@ -578,7 +1238,9 @@ export default function App() {
                 selectedEvent={selectedEvent}
                 onSelectEvent={handleSelectEvent}
                 permissionError={permissionError}
-                onClearPermissionError={() => setPermissionError(null)}
+                onClearPermissionError={() =>
+                  setPermissionError(null)
+                }
               />
             ) : (
               <EventDetailView
@@ -586,7 +1248,11 @@ export default function App() {
                 isLoading={isDetailLoading}
                 onBack={() => setViewState('list')}
                 onStartScanning={() => {
-                  if (activeSession && activeSession.active && activeSession.eventId === selectedEvent.id) {
+                  if (
+                    activeSession &&
+                    activeSession.active &&
+                    activeSession.eventId === selectedEvent.id
+                  ) {
                     setCurrentTab('scan');
                   } else {
                     setShowSessionModal(true);
@@ -595,7 +1261,11 @@ export default function App() {
                 onViewAttendees={() => {
                   setCurrentTab('attendees');
                   setIsAttendeesLoading(true);
-                  setTimeout(() => setIsAttendeesLoading(false), 300);
+
+                  setTimeout(
+                    () => setIsAttendeesLoading(false),
+                    300,
+                  );
                 }}
                 activeSession={activeSession}
               />
@@ -610,9 +1280,15 @@ export default function App() {
             tickets={tickets}
             onScanTicket={handleScanTicket}
             onBackToEvent={() => setCurrentTab('events')}
-            onStartSessionRequest={() => setShowSessionModal(true)}
+            onStartSessionRequest={() =>
+              setShowSessionModal(true)
+            }
             isContinuousScan={isContinuousScan}
-            onToggleContinuousScan={() => setIsContinuousScan((prev) => !prev)}
+            onToggleContinuousScan={() =>
+              setIsContinuousScan(
+                (previous) => !previous,
+              )
+            }
           />
         )}
 
@@ -620,9 +1296,16 @@ export default function App() {
           <AttendeesView
             event={selectedEvent}
             tickets={tickets}
-            isLoading={isAttendeesLoading}
-            onSelectTicket={(ticket) => setSelectedTicketForDetail(ticket)}
-            onUpdateStatusDirect={(ticketId, status) => {
+            isLoading={
+              isAttendeesLoading || isTicketsLoading
+            }
+            onSelectTicket={(ticket) =>
+              setSelectedTicketForDetail(ticket)
+            }
+            onUpdateStatusDirect={(
+              ticketId,
+              status,
+            ) => {
               updateTicketStatus(ticketId, status);
               soundFX.playClick();
             }}
@@ -630,16 +1313,23 @@ export default function App() {
         )}
       </main>
 
-      {/* Scan Result Overlay Popover */}
       {activeScanResult && (
         <ScanResultCard
           ticket={activeScanResult.ticket}
           scanTime={activeScanResult.scanTime}
-          isDuplicateScan={activeScanResult.isDuplicate}
-          isOfflineQueued={activeScanResult.isOfflineQueued}
+          isDuplicateScan={
+            activeScanResult.isDuplicate
+          }
+          isOfflineQueued={
+            activeScanResult.isOfflineQueued
+          }
           isContinuousMode={isContinuousScan}
           onUpdateStatus={(newStatus) => {
-            updateTicketStatus(activeScanResult.ticket.id, newStatus);
+            updateTicketStatus(
+              activeScanResult.ticket.id,
+              newStatus,
+            );
+
             handleDismissResult();
             soundFX.playClick();
           }}
@@ -647,40 +1337,55 @@ export default function App() {
         />
       )}
 
-      {/* Check-in Session Setup Modal */}
       {showSessionModal && selectedEvent && (
         <CheckInSessionModal
           event={selectedEvent}
           user={currentUser}
           onClose={() => setShowSessionModal(false)}
-          onConfirmStartSession={handleStartSessionConfirm}
+          onConfirmStartSession={
+            handleStartSessionConfirm
+          }
         />
       )}
 
-      {/* Ticket Detail Modal */}
       {selectedTicketForDetail && (
         <TicketDetailModal
           ticket={selectedTicketForDetail}
-          onClose={() => setSelectedTicketForDetail(null)}
+          onClose={() =>
+            setSelectedTicketForDetail(null)
+          }
           onUpdateStatus={(ticketId, newStatus) => {
-            updateTicketStatus(ticketId, newStatus);
+            updateTicketStatus(
+              ticketId,
+              newStatus,
+            );
             soundFX.playClick();
           }}
         />
       )}
 
-      {/* Footer Navigation */}
       <FooterNavigation
         currentTab={currentTab}
         onTabChange={(tab) => {
-          if (tab === 'attendees' && currentTab !== 'attendees') {
+          if (
+            tab === 'attendees' &&
+            currentTab !== 'attendees'
+          ) {
             setIsAttendeesLoading(true);
-            setTimeout(() => setIsAttendeesLoading(false), 300);
+
+            setTimeout(
+              () => setIsAttendeesLoading(false),
+              300,
+            );
           }
+
           setCurrentTab(tab);
           setPermissionError(null);
         }}
-        isScanningActive={Boolean(activeSession && activeSession.active)}
+        isScanningActive={Boolean(
+          activeSession &&
+            activeSession.active,
+        )}
         hasActiveEvent={Boolean(selectedEvent)}
       />
     </div>
