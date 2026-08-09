@@ -5,8 +5,8 @@ interface LoginViewProps {
   onLogin?: (user: User) => void;
 }
 
-const LOGIN_URL = import.meta.env.VITE_BUYMESHO_LOGIN_URL ?? "https://buymesho.vercel.app/login";
-const SIGNUP_URL = import.meta.env.VITE_BUYMESHO_SIGNUP_URL ?? "https://buymesho.vercel.app/signup";
+const LOGIN_URL = import.meta.env.VITE_BUYMESHO_LOGIN_URL ?? "https://buymesho.app/login";
+const SIGNUP_URL = import.meta.env.VITE_BUYMESHO_SIGNUP_URL ?? "https://buymesho.app/signup";
 
 export function LoginView(_props: LoginViewProps) {
   return (
