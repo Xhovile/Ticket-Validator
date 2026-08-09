@@ -4,6 +4,11 @@ import { auth, getFreshIdToken } from '../firebase';
 // to the BuyMesho backend, avoiding browser-to-Render CORS during auth handoff.
 const API_BASE_URL = '';
 
+// 460 is intentionally client-local: BuyMesho returned 403 because the
+// authenticated Firebase user no longer has Validator approval. This is an
+// access denial, not a reason to destroy the Firebase session.
+const VALIDATOR_ACCESS_DENIED_STATUS = 460;
+
 export type ValidatorIdentity = {
   uid: string;
   email: string | null;
@@ -97,38 +102,92 @@ type SessionExchangeResponse = {
   customToken: string;
 };
 
-async function requireFreshFirebaseToken() {
+async function requireFreshFirebaseToken(forceRefresh = false) {
   if (!auth.currentUser) {
     throw Object.assign(new Error('No authenticated Firebase user.'), { status: 401 });
   }
 
-  return getFreshIdToken();
+  // Firebase Auth owns token lifecycle. getIdToken() refreshes an expired
+  // token automatically; forceRefresh is used only after a server-side 401.
+  return getFreshIdToken(forceRefresh);
 }
 
-async function fetchJson<T>(path: string, _unusedToken?: string, init?: RequestInit): Promise<T> {
-  const effectiveToken = await requireFreshFirebaseToken();
-
+async function requestJson<T>(path: string, token: string, init?: RequestInit): Promise<{ response: Response; payload: T | Record<string, unknown> }> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${effectiveToken}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
     },
   });
 
   const payload = await response.json().catch(() => ({}));
+  return { response, payload };
+}
 
-  if (!response.ok) {
-    const error = payload && typeof payload === "object" && "error" in payload
-      ? String((payload as { error?: unknown }).error ?? "Request failed")
-      : "Request failed";
+function buildApiError(response: Response, payload: unknown) {
+  const error = payload && typeof payload === "object" && "error" in payload
+    ? String((payload as { error?: unknown }).error ?? "Request failed")
+    : "Request failed";
 
-    throw Object.assign(new Error(error), { status: response.status, payload });
+  return Object.assign(new Error(error), {
+    status: response.status,
+    payload,
+  });
+}
+
+async function fetchJson<T>(path: string, _unusedToken?: string, init?: RequestInit): Promise<T> {
+  let effectiveToken = await requireFreshFirebaseToken();
+  let result: { response: Response; payload: T | Record<string, unknown> };
+
+  try {
+    result = await requestJson<T>(path, effectiveToken, init);
+  } catch (error) {
+    // Network/DNS/browser connectivity failures are deliberately propagated
+    // without touching Firebase Auth. The user remains authenticated.
+    const message = error instanceof Error ? error.message : String(error);
+    throw Object.assign(new Error(`Unable to reach BuyMesho Validator API: ${message}`), {
+      status: 0,
+      cause: error,
+    });
   }
 
-  return payload as T;
+  // A server-side 401 can mean the ID token expired between Firebase's local
+  // check and the request. Force one Firebase refresh and retry once. If the
+  // refreshed token is still rejected, treat the authorization as genuinely
+  // invalid/revoked and destroy the Firebase session.
+  if (result.response.status === 401) {
+    try {
+      effectiveToken = await requireFreshFirebaseToken(true);
+      result = await requestJson<T>(path, effectiveToken, init);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await signOutValidator().catch(() => undefined);
+      throw Object.assign(new Error(message), { status: 401, cause: error });
+    }
+
+    if (result.response.status === 401) {
+      await signOutValidator().catch(() => undefined);
+      throw buildApiError(result.response, result.payload);
+    }
+  }
+
+  if (!result.response.ok) {
+    const error = buildApiError(result.response, result.payload);
+
+    // BuyMesho uses 403 here for removal/expiry of event-creator approval.
+    // Deny Validator access, but do NOT sign the user out of Firebase.
+    if (error.status === 403) {
+      error.status = VALIDATOR_ACCESS_DENIED_STATUS;
+    }
+
+    // 5xx and network failures never destroy the Firebase session.
+    throw error;
+  }
+
+  return result.payload as T;
 }
 
 export async function exchangeValidatorSession(token: string) {
@@ -244,5 +303,7 @@ export async function signOutValidator() {
 }
 
 export function clearToken() {
-  void auth.signOut();
+  // Backward-compatible alias used by existing UI code. Firebase Auth remains
+  // the only session authority, so clearing the session means signing out.
+  void signOutValidator();
 }
