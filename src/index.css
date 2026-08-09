@@ -1,3 +1,4 @@
+@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
@@ -104,7 +105,6 @@ img {
   color: var(--text-primary);
 }
 
-/* Shared utility classes for the redesigned interface. */
 .app-surface {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -153,6 +153,26 @@ img {
   --text-muted: #374151;
   --border: #c7cdd4;
   --border-strong: #9ca3af;
+}
+
+@keyframes flash-green {
+  0% { background-color: rgba(22, 163, 74, 0.4); transform: scale(1.02); }
+  50% { background-color: rgba(22, 163, 74, 0.2); }
+  100% { background-color: transparent; transform: scale(1); }
+}
+
+@keyframes flash-red {
+  0% { background-color: rgba(220, 38, 38, 0.4); transform: scale(1.02); }
+  50% { background-color: rgba(220, 38, 38, 0.2); }
+  100% { background-color: transparent; transform: scale(1); }
+}
+
+.animate-flash-valid {
+  animation: flash-green 300ms ease-out forwards;
+}
+
+.animate-flash-invalid {
+  animation: flash-red 300ms ease-out forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
