@@ -65,7 +65,7 @@ export function clearOfflineQueue(): void {
   try {
     localStorage.removeItem(OFFLINE_QUEUE_KEY);
   } catch (err) {
-    console.error('Failed to clear offline queue:', err);
+    console.error('Failed to clear offline queue from localStorage:', err);
   }
 }
 
@@ -83,17 +83,29 @@ export async function requestBackgroundSync(): Promise<boolean> {
   return false;
 }
 
+/**
+ * Register the worker with a versioned script URL and updateViaCache=none.
+ * This is intentionally versioned because an older worker can have cached
+ * /sw.js itself. A changed script URL guarantees existing installations get
+ * a chance to download the current worker instead of repeatedly executing the
+ * stale cached worker that can cause deep-link blank pages.
+ */
 export function registerServiceWorker(): void {
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((reg) => {
-          console.log('ServiceWorker registered with scope: ', reg.scope);
-        })
-        .catch((err) => {
-          console.warn('ServiceWorker registration failed: ', err);
-        });
-    });
-  }
+  if (!('serviceWorker' in navigator)) return;
+
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js?v=8', {
+        updateViaCache: 'none',
+      });
+
+      // Ask the browser to check immediately instead of waiting for its normal
+      // service-worker update interval.
+      await registration.update();
+
+      console.log('ServiceWorker registered with scope: ', registration.scope);
+    } catch (err) {
+      console.warn('ServiceWorker registration failed: ', err);
+    }
+  });
 }
