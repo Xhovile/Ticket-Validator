@@ -46,14 +46,11 @@ export function useValidatorController() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
-  // Keep the browser URL synchronized with the active workspace section.
-  // replaceState is intentional: the navigation tabs represent application state,
-  // while browser history remains available for external navigation and auth redirects.
   useEffect(() => {
     const targetPath = pathForTab(currentTab);
     const currentPath = window.location.pathname.replace(/\/+$/, '') || '/';
     if (currentPath !== targetPath) {
-      window.history.replaceState({}, document.title, `${targetPath}${window.location.search}${window.location.hash}`);
+      window.history.pushState({}, document.title, `${targetPath}${window.location.search}${window.location.hash}`);
     }
   }, [currentTab]);
 
@@ -107,13 +104,8 @@ export function useValidatorController() {
         const validStoredSession = storedSession && mappedEvents.some((event) => event.id === storedSession.eventId) ? storedSession : null;
         setActiveSession(validStoredSession);
         setSelectedEvent(mappedEvents.find((event) => event.id === validStoredSession?.eventId) || mappedEvents[0] || null);
-        if (!validStoredSession) {
-          setCurrentTab(tabFromPathname(window.location.pathname));
-          setViewState('list');
-        } else {
-          // Preserve a directly requested URL such as /scanner or /attendees on refresh.
-          setCurrentTab(tabFromPathname(window.location.pathname));
-        }
+        setCurrentTab(tabFromPathname(window.location.pathname));
+        setViewState('list');
         setIsAuthenticating(false);
       } catch (error: any) {
         if (cancelled) return;
