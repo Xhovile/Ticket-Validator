@@ -229,4 +229,5 @@ export async function signOutValidator() {
 
 export function clearToken() {
   saveToken("");
+  void auth.signOut();
 }
