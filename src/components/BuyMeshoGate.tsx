@@ -155,18 +155,18 @@ export default function BuyMeshoGate() {
                 href={loginUrl}
                 primary
                 icon={<LogIn className="h-5 w-5" />}
-                label="Continue with BuyMesho"
-                caption="Use your existing BuyMesho event creator account."
+                label="Sign in with BuyMesho"
+                caption="Use your BuyMesho event creator account to continue."
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-4 text-center text-xs font-medium tracking-wide text-white/60 shadow-sm">
+          <div className="flex items-center justify-center gap-2 text-xs font-medium tracking-wide text-white/40">
             <ShieldCheck className="h-4 w-4 shrink-0" />
             <span>SIMPLE & SECURE</span>
           </div>
 
-          <div className="text-center text-[11px] uppercase tracking-[0.22em] text-white/30">
+          <div className="pt-5 text-center text-[11px] uppercase tracking-[0.22em] text-white/30">
             Access is tied to your BuyMesho session
           </div>
         </div>
