@@ -16,6 +16,11 @@
   --brand-accent-strong: #b8862f;
   --brand-accent-soft: #fbf6ea;
 
+  /* Validator dark surface — the same navy used by the session-restoration screen */
+  --brand-dark-surface: #020617;
+  --brand-dark-surface-hover: #0f172a;
+  --brand-dark-foreground: #ffffff;
+
   /* Neutral surfaces */
   --bg: #ffffff;
   --surface: #ffffff;
@@ -103,6 +108,32 @@ img {
 ::selection {
   background: rgba(217, 164, 65, 0.22);
   color: var(--text-primary);
+}
+
+/* Brand dark surfaces: keep the same navy wherever the UI uses a solid blue/dark action surface. */
+.brand-dark-surface {
+  background: var(--brand-dark-surface);
+  color: var(--brand-dark-foreground);
+}
+
+.brand-dark-surface:hover {
+  background: var(--brand-dark-surface-hover);
+}
+
+/* Backstop for existing Tailwind brand-blue/dark utilities so older components cannot
+   reintroduce the brighter indigo/blue surface seen on the access loader and filters. */
+.bg-blue-600,
+.bg-indigo-600,
+.bg-zinc-950 {
+  background-color: var(--brand-dark-surface) !important;
+  color: var(--brand-dark-foreground) !important;
+}
+
+.bg-blue-700,
+.bg-indigo-700,
+.bg-zinc-800 {
+  background-color: var(--brand-dark-surface-hover) !important;
+  color: var(--brand-dark-foreground) !important;
 }
 
 .app-surface {
