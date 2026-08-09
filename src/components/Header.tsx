@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScanLine, ShieldCheck, User as UserIcon, LogOut, Radio, Sun, Smartphone } from 'lucide-react';
+import { ScanLine, ShieldCheck, User as UserIcon, LogOut, Sun, Smartphone } from 'lucide-react';
 import { User, CheckInSession } from '../types';
 import { INITIAL_USERS } from '../data/mockData';
 import { soundFX } from '../utils/audio';
@@ -25,6 +25,30 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleHighContrast,
 }) => {
   const [showUserDropdown, setShowUserDropdown] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!showUserDropdown) return;
+
+    const handleOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      const profileArea = document.getElementById('validator-profile-menu');
+      if (profileArea && !profileArea.contains(target)) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowUserDropdown(false);
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointer);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showUserDropdown]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur-xl">
@@ -62,11 +86,11 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           {user ? (
-            <div className="relative">
+            <div id="validator-profile-menu" className="relative">
               <button
                 type="button"
                 onClick={() => setShowUserDropdown((open) => !open)}
-                className="flex min-h-9 items-center gap-2 rounded-[10px] border border-zinc-200 bg-white p-1 pl-2 transition hover:border-zinc-300 hover:bg-zinc-50 focus:outline-none"
+                className={`flex min-h-9 items-center gap-2 rounded-[10px] border bg-white p-1 pl-2 transition focus:outline-none ${showUserDropdown ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
                 aria-expanded={showUserDropdown}
                 aria-haspopup="menu"
               >
@@ -77,83 +101,71 @@ export const Header: React.FC<HeaderProps> = ({
                 {user.avatarUrl ? (
                   <img src={user.avatarUrl} alt={user.name} className="h-7 w-7 rounded-lg border border-zinc-200 object-cover" />
                 ) : (
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-xs font-bold text-indigo-700">
-                    {user.name.charAt(0)}
-                  </div>
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-xs font-bold text-indigo-700">{user.name.charAt(0)}</div>
                 )}
               </button>
 
               {showUserDropdown && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowUserDropdown(false)} />
-                  <div className="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-xl border border-zinc-200 bg-white p-2 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.22)]">
-                    <div className="border-b border-zinc-100 px-3 py-2.5">
-                      <p className="text-xs font-semibold text-zinc-900">{user.name}</p>
-                      <p className="mt-0.5 truncate text-[11px] text-zinc-500">{user.email}</p>
-                      <div className="mt-2 flex items-center gap-1.5 text-[10px] font-medium text-zinc-500">
-                        <ShieldCheck className="h-3.5 w-3.5 text-indigo-600" />
-                        <span>{user.assignedEventIds.length} Assigned Events</span>
+                <div className="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-xl border border-zinc-200 bg-white p-2 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.22)]" role="menu">
+                  <div className="border-b border-zinc-100 px-3 py-2.5">
+                    <div className="flex items-center gap-3">
+                      {user.avatarUrl ? (
+                        <img src={user.avatarUrl} alt={user.name} className="h-10 w-10 rounded-xl border border-zinc-200 object-cover" />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-sm font-bold text-indigo-700">{user.name.charAt(0)}</div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-zinc-900">{user.name}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-zinc-500">{user.email}</p>
                       </div>
                     </div>
-
-                    <div className="my-1.5 space-y-2 rounded-lg bg-zinc-50 p-2.5">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`rounded-lg p-1.5 ${isHighContrast ? 'bg-amber-100 text-amber-700' : 'bg-white text-zinc-500 ring-1 ring-zinc-200'}`}>
-                            <Sun className="h-3.5 w-3.5" />
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-semibold leading-tight text-zinc-900">Sunlight High Contrast</p>
-                            <p className="mt-0.5 text-[10px] text-zinc-500">Outdoor legibility boost</p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={onToggleHighContrast}
-                          className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors focus:outline-none ${isHighContrast ? 'bg-amber-500' : 'bg-zinc-300'}`}
-                          role="switch"
-                          aria-checked={isHighContrast}
-                        >
-                          <span className={`pointer-events-none h-4 w-4 translate-y-0.5 rounded-full bg-white shadow-sm transition-transform ${isHighContrast ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-3 border-t border-zinc-200/70 pt-2">
-                        <div className="flex items-center gap-2.5">
-                          <div className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600"><Smartphone className="h-3.5 w-3.5" /></div>
-                          <div>
-                            <p className="text-[11px] font-semibold leading-tight text-zinc-900">Haptic Feedback</p>
-                            <p className="mt-0.5 text-[10px] text-zinc-500">Concert gate vibration</p>
-                          </div>
-                        </div>
-                        <button type="button" onClick={() => soundFX.playSuccess()} className="rounded-lg bg-zinc-950 px-2.5 py-1.5 text-[10px] font-semibold text-white transition hover:bg-zinc-800">Test</button>
-                      </div>
-                    </div>
-
-                    <div className="px-2 py-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-zinc-400">Switch Demo Account</div>
-                    {INITIAL_USERS.map((u) => (
-                      <button
-                        key={u.id}
-                        type="button"
-                        onClick={() => { onSwitchUser(u); setShowUserDropdown(false); }}
-                        className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left transition ${u.id === user.id ? 'bg-indigo-50 text-indigo-900' : 'text-zinc-700 hover:bg-zinc-50'}`}
-                      >
-                        <UserIcon className={`h-3.5 w-3.5 shrink-0 ${u.id === user.id ? 'text-indigo-600' : 'text-zinc-400'}`} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[11px] font-medium">{u.name}</p>
-                          <p className="truncate text-[10px] capitalize text-zinc-500">{u.role} · {u.assignedEventIds.length} events</p>
-                        </div>
-                      </button>
-                    ))}
-
-                    <div className="mt-1 border-t border-zinc-100 pt-1">
-                      <button type="button" onClick={() => { setShowUserDropdown(false); onLogout(); }} className="flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[11px] font-semibold text-red-600 transition hover:bg-red-50">
-                        <LogOut className="h-3.5 w-3.5" />
-                        Sign Out
-                      </button>
+                    <div className="mt-2 flex items-center gap-1.5 text-[10px] font-medium text-zinc-500">
+                      <ShieldCheck className="h-3.5 w-3.5 text-indigo-600" />
+                      <span>{user.assignedEventIds.length} Assigned Events</span>
                     </div>
                   </div>
-                </>
+
+                  <div className="my-1.5 space-y-2 rounded-lg bg-zinc-50 p-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`rounded-lg p-1.5 ${isHighContrast ? 'bg-amber-100 text-amber-700' : 'bg-white text-zinc-500 ring-1 ring-zinc-200'}`}><Sun className="h-3.5 w-3.5" /></div>
+                        <div>
+                          <p className="text-[11px] font-semibold leading-tight text-zinc-900">Sunlight High Contrast</p>
+                          <p className="mt-0.5 text-[10px] text-zinc-500">Outdoor legibility boost</p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={onToggleHighContrast} className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors focus:outline-none ${isHighContrast ? 'bg-amber-500' : 'bg-zinc-300'}`} role="switch" aria-checked={isHighContrast}>
+                        <span className={`pointer-events-none h-4 w-4 translate-y-0.5 rounded-full bg-white shadow-sm transition-transform ${isHighContrast ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 border-t border-zinc-200/70 pt-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600"><Smartphone className="h-3.5 w-3.5" /></div>
+                        <div>
+                          <p className="text-[11px] font-semibold leading-tight text-zinc-900">Haptic Feedback</p>
+                          <p className="mt-0.5 text-[10px] text-zinc-500">Concert gate vibration</p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => soundFX.playSuccess()} className="rounded-lg bg-amber-500 px-2.5 py-1.5 text-[10px] font-semibold text-white transition hover:bg-amber-600">Test</button>
+                    </div>
+                  </div>
+
+                  <div className="px-2 py-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-zinc-400">Switch Demo Account</div>
+                  {INITIAL_USERS.map((u) => (
+                    <button key={u.id} type="button" onClick={() => { onSwitchUser(u); setShowUserDropdown(false); }} className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left transition ${u.id === user.id ? 'bg-indigo-50 text-indigo-900' : 'text-zinc-700 hover:bg-zinc-50'}`}>
+                      <UserIcon className={`h-3.5 w-3.5 shrink-0 ${u.id === user.id ? 'text-indigo-600' : 'text-zinc-400'}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[11px] font-medium">{u.name}</p>
+                        <p className="truncate text-[10px] capitalize text-zinc-500">{u.role} · {u.assignedEventIds.length} events</p>
+                      </div>
+                    </button>
+                  ))}
+
+                  <div className="mt-1 border-t border-zinc-100 pt-1">
+                    <button type="button" onClick={() => { setShowUserDropdown(false); onLogout(); }} className="flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[11px] font-semibold text-red-600 transition hover:bg-red-50"><LogOut className="h-3.5 w-3.5" />Sign Out</button>
+                  </div>
+                </div>
               )}
             </div>
           ) : (
