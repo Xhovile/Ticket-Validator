@@ -1,134 +1,167 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-@layer base {
-  :root {
-    --bg-main: #ffffff;
-    --bg-secondary: #f8fafc;
-    --card-border: #e2e8f0;
-    --primary-blue: #2563eb;
-    --primary-blue-hover: #1d4ed8;
-    --text-primary: #111827;
-    --text-secondary: #6b7280;
-  }
+:root {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #17202a;
+  background: #ffffff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 
-  html {
-    color-scheme: light;
-    -webkit-text-size-adjust: 100%;
-    text-rendering: optimizeLegibility;
-  }
+  /* BuyMesho-inspired brand foundation */
+  --brand-primary: #111827;
+  --brand-accent: #d9a441;
+  --brand-accent-strong: #b8862f;
+  --brand-accent-soft: #fbf6ea;
 
-  html, body, button, input, select, textarea {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  }
+  /* Neutral surfaces */
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-subtle: #f8f9fa;
+  --surface-muted: #f3f4f6;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
 
-  body {
-    min-height: 100vh;
-    background:
-      radial-gradient(circle at top, rgba(15, 23, 42, 0.04), transparent 38%),
-      linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
-    color: #111827;
-    -webkit-tap-highlight-color: transparent;
-  }
+  /* Typography */
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --text-disabled: #9ca3af;
 
-  #root {
-    min-height: 100vh;
-  }
+  /* Operational states */
+  --success: #16803c;
+  --success-soft: #edf8f1;
+  --warning: #a16207;
+  --warning-soft: #fff8e7;
+  --danger: #b42318;
+  --danger-soft: #fff1f0;
+  --info: #2563eb;
+  --info-soft: #eff6ff;
+  --purple: #6941c6;
+  --purple-soft: #f5f3ff;
 
-  ::selection {
-    background: rgba(37, 99, 235, 0.18);
-    color: #111827;
-  }
+  /* Shape and elevation */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 14px rgba(16, 24, 40, 0.06);
+  --focus-ring: 0 0 0 3px rgba(217, 164, 65, 0.22);
 
-  button,
-  input,
-  select,
-  textarea {
-    outline: none;
-  }
+  color-scheme: light;
+}
 
-  button:focus-visible,
-  input:focus-visible,
-  select:focus-visible,
-  textarea:focus-visible {
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
-  }
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  min-width: 320px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+img {
+  max-width: 100%;
+}
+
+::selection {
+  background: rgba(217, 164, 65, 0.22);
+  color: var(--text-primary);
+}
+
+/* Shared utility classes for the redesigned interface. */
+.app-surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.app-subtle-surface {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.brand-accent {
+  color: var(--brand-accent-strong);
+}
+
+.status-success {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.status-warning {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.status-danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.status-info {
+  color: var(--info);
+  background: var(--info-soft);
+}
+
+.status-purple {
+  color: var(--purple);
+  background: var(--purple-soft);
 }
 
 .sunlight-high-contrast {
-  filter: contrast(135%) saturate(120%);
+  --text-primary: #000000;
+  --text-secondary: #1f2937;
+  --text-muted: #374151;
+  --border: #c7cdd4;
+  --border-strong: #9ca3af;
 }
 
-.sunlight-high-contrast body {
-  background-color: #ffffff !important;
-  color: #000000 !important;
-}
-
-.sunlight-high-contrast p,
-.sunlight-high-contrast span,
-.sunlight-high-contrast h1,
-.sunlight-high-contrast h2,
-.sunlight-high-contrast h3,
-.sunlight-high-contrast h4,
-.sunlight-high-contrast h5,
-.sunlight-high-contrast h6,
-.sunlight-high-contrast button,
-.sunlight-high-contrast td,
-.sunlight-high-contrast th,
-.sunlight-high-contrast input {
-  font-weight: 600 !important;
-  letter-spacing: -0.01em;
-}
-
-.sunlight-high-contrast .text-slate-400,
-.sunlight-high-contrast .text-slate-500,
-.sunlight-high-contrast .text-slate-600 {
-  color: #1e293b !important;
-}
-
-.sunlight-high-contrast .bg-slate-50,
-.sunlight-high-contrast .bg-slate-100 {
-  background-color: #e2e8f0 !important;
-}
-
-.sunlight-high-contrast .border-slate-100,
-.sunlight-high-contrast .border-slate-200 {
-  border-color: #64748b !important;
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-@keyframes flash-green {
-  0% { background-color: rgba(22, 163, 74, 0.4); transform: scale(1.02); }
-  50% { background-color: rgba(22, 163, 74, 0.2); }
-  100% { background-color: transparent; transform: scale(1); }
-}
-
-@keyframes flash-red {
-  0% { background-color: rgba(220, 38, 38, 0.4); transform: scale(1.02); }
-  50% { background-color: rgba(220, 38, 38, 0.2); }
-  100% { background-color: transparent; transform: scale(1); }
-}
-
-.animate-flash-valid {
-  animation: flash-green 300ms ease-out forwards;
-}
-
-.animate-flash-invalid {
-  animation: flash-red 300ms ease-out forwards;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
