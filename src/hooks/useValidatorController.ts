@@ -7,30 +7,10 @@ import {
   ActivityLogEntry,
   CheckInSession,
 } from '../types';
-
-import {
-  loadStoredLogs,
-  saveStoredLogs,
-  loadStoredSession,
-  saveStoredSession,
-} from '../data/mockData';
-
+import { loadStoredLogs, saveStoredLogs, loadStoredSession, saveStoredSession } from '../data/mockData';
 import { soundFX } from '../utils/audio';
-
-import {
-  getOfflineQueue,
-  enqueueValidation,
-  clearOfflineQueue,
-  QueuedValidation,
-} from '../utils/offlineSyncManager';
-
-import {
-  fetchValidatorMe,
-  fetchValidatorTickets,
-  getStoredToken,
-  clearToken,
-} from '../lib/buymeshoApi';
-
+import { getOfflineQueue, enqueueValidation, clearOfflineQueue, QueuedValidation } from '../utils/offlineSyncManager';
+import { fetchValidatorMe, fetchValidatorTickets, getStoredToken, clearToken } from '../lib/buymeshoApi';
 import type { NavTab } from '../components/FooterNavigation';
 import { mapValidatorTicket } from '../lib/validatorMappers';
 import { buildValidatorSession } from '../lib/validatorSession';
@@ -42,7 +22,6 @@ export function useValidatorController() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [logs, setLogs] = useState<ActivityLogEntry[]>(() => loadStoredLogs());
   const [activeSession, setActiveSession] = useState<CheckInSession | null>(() => loadStoredSession());
-
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isTicketsLoading, setIsTicketsLoading] = useState(false);
@@ -51,10 +30,7 @@ export function useValidatorController() {
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isAttendeesLoading, setIsAttendeesLoading] = useState(false);
-
-  const [isHighContrast, setIsHighContrast] = useState<boolean>(() => {
-    return localStorage.getItem('buymesho_high_contrast') === 'true';
-  });
+  const [isHighContrast, setIsHighContrast] = useState<boolean>(() => localStorage.getItem('buymesho_high_contrast') === 'true');
 
   useEffect(() => {
     document.documentElement.classList.toggle('sunlight-high-contrast', isHighContrast);
@@ -70,13 +46,13 @@ export function useValidatorController() {
   const [isContinuousScan, setIsContinuousScan] = useState<boolean>(true);
   const autoDismissTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastScanThrottleRef = useRef<{ code: string; time: number }>({ code: '', time: 0 });
-
-  const [activeScanResult, setActiveScanResult] = useState<{
-    ticket: Ticket;
-    scanTime: string;
-    isDuplicate: boolean;
-    isOfflineQueued?: boolean;
-  } | null>(null);
+  const [activeScanResult, setActiveScanResult] = useState<{ ticket: Ticket; scanTime: string; isDuplicate: boolean; isOfflineQueued?: boolean } | null>(null);
+  const [selectedTicketForDetail, setSelectedTicketForDetail] = useState<Ticket | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(() => navigator.onLine);
+  const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
+  const [offlineQueue, setOfflineQueue] = useState<QueuedValidation[]>(() => getOfflineQueue());
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
   const handleDismissResult = () => {
     if (autoDismissTimerRef.current) {
@@ -86,19 +62,10 @@ export function useValidatorController() {
     setActiveScanResult(null);
   };
 
-  const [selectedTicketForDetail, setSelectedTicketForDetail] = useState<Ticket | null>(null);
-  const [isOnline, setIsOnline] = useState<boolean>(() => navigator.onLine);
-  const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
-  const [offlineQueue, setOfflineQueue] = useState<QueuedValidation[]>(() => getOfflineQueue());
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
-
   useEffect(() => {
     let cancelled = false;
-
     const authenticateWithBuyMesho = async () => {
       const token = getStoredToken();
-
       if (!token) {
         if (!cancelled) {
           setAuthError('Your BuyMesho session is missing.');
@@ -106,53 +73,36 @@ export function useValidatorController() {
         }
         return;
       }
-
       try {
         setIsAuthenticating(true);
         setAuthError(null);
-
         const response = await fetchValidatorMe(token);
         if (cancelled) return;
-
         if (!response.access_scope?.can_validate_tickets) {
           setAuthError('Your BuyMesho account does not have permission to validate tickets.');
           setIsAuthenticating(false);
           return;
         }
-
-        const session = buildValidatorSession(response);
-        const { user, events: mappedEvents, authorizedEventIds } = session;
-
+        const { user, events: mappedEvents } = buildValidatorSession(response);
         setCurrentUser(user);
         setEvents(mappedEvents);
-
         const storedSession = loadStoredSession();
-        const validStoredSession = storedSession && mappedEvents.some((event) => event.id === storedSession.eventId)
-          ? storedSession
-          : null;
-
+        const validStoredSession = storedSession && mappedEvents.some((event) => event.id === storedSession.eventId) ? storedSession : null;
         setActiveSession(validStoredSession);
-        setSelectedEvent(
-          mappedEvents.find((event) => event.id === validStoredSession?.eventId) || mappedEvents[0] || null,
-        );
-
+        setSelectedEvent(mappedEvents.find((event) => event.id === validStoredSession?.eventId) || mappedEvents[0] || null);
         if (!validStoredSession) {
           setCurrentTab('events');
           setViewState('list');
         }
-
-        void authorizedEventIds;
         setIsAuthenticating(false);
       } catch (error: any) {
         if (cancelled) return;
-
         if (error?.status === 401 || error?.status === 403) {
           clearToken();
           setAuthError('Your BuyMesho session is no longer valid or does not have Ticket Validator access.');
         } else {
           setAuthError(error?.message || 'Unable to verify your BuyMesho account. Please try again.');
         }
-
         setCurrentUser(null);
         setEvents([]);
         setSelectedEvent(null);
@@ -160,43 +110,35 @@ export function useValidatorController() {
         setIsAuthenticating(false);
       }
     };
-
     authenticateWithBuyMesho();
     return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-
     const loadTickets = async () => {
       if (!selectedEvent) {
         setTickets([]);
         return;
       }
-
       const token = getStoredToken();
       if (!token) {
         setTickets([]);
         return;
       }
-
       try {
         setIsTicketsLoading(true);
         const response = await fetchValidatorTickets(token, selectedEvent.id);
         if (cancelled) return;
-
         const mappedTickets = response.tickets.map(mapValidatorTicket);
         setTickets(mappedTickets);
-        setEvents((previousEvents) => previousEvents.map((event) => event.id === selectedEvent.id
-          ? {
-              ...event,
-              totalTicketsSold: mappedTickets.length,
-              checkedInCount: mappedTickets.filter((ticket) => ticket.status === 'Inside').length,
-            }
-          : event));
+        setEvents((previousEvents) => previousEvents.map((event) => event.id === selectedEvent.id ? {
+          ...event,
+          totalTicketsSold: mappedTickets.length,
+          checkedInCount: mappedTickets.filter((ticket) => ticket.status === 'Inside').length,
+        } : event));
       } catch (error: any) {
         if (cancelled) return;
-
         if (error?.status === 401 || error?.status === 403) {
           clearToken();
           setAuthError('Your BuyMesho session has expired. Please sign in again.');
@@ -209,15 +151,10 @@ export function useValidatorController() {
         if (!cancelled) setIsTicketsLoading(false);
       }
     };
-
     loadTickets();
     return () => { cancelled = true; };
   }, [selectedEvent?.id]);
 
-  // The remaining controller logic is intentionally kept together for now:
-  // scan state, offline queueing, ticket-state transitions, and navigation all
-  // share the same state machine. These are isolated from App.tsx and can be
-  // split into focused hooks later without changing the UI composition.
   const handleSyncNow = async () => {
     const queue = getOfflineQueue();
     if (queue.length === 0) return;
@@ -246,7 +183,6 @@ export function useValidatorController() {
 
   const handleOnline = () => setIsOnline(true);
   const handleOffline = () => setIsOnline(false);
-
   useEffect(() => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -285,20 +221,12 @@ export function useValidatorController() {
     autoDismissTimerRef.current = setTimeout(() => setActiveScanResult(null), delay);
   };
 
-  const updateTicketStatus = (
-    ticketId: string,
-    newStatus: TicketStatus,
-    gateNameOverride?: string,
-    staffNameOverride?: string,
-    timestampOverride?: string,
-    isOfflineAction?: boolean,
-  ) => {
+  const updateTicketStatus = (ticketId: string, newStatus: TicketStatus, gateNameOverride?: string, staffNameOverride?: string, timestampOverride?: string, isOfflineAction?: boolean) => {
     const timestamp = timestampOverride || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const gate = gateNameOverride || activeSession?.gateName || 'Main Gate';
     const staff = staffNameOverride || currentUser?.name || 'Gate Officer';
     const effectiveOffline = isOfflineAction !== undefined ? isOfflineAction : !isOnline || isSimulatedOffline;
     const targetTicket = tickets.find((ticket) => ticket.id === ticketId);
-
     if (targetTicket && effectiveOffline) {
       enqueueValidation({
         ticketId,
@@ -313,27 +241,23 @@ export function useValidatorController() {
       });
       setOfflineQueue(getOfflineQueue());
     }
-
-    setTickets((previousTickets) => previousTickets.map((ticket) => ticket.id === ticketId
-      ? {
-          ...ticket,
-          status: newStatus,
-          lastCheckedInTime: newStatus === 'Inside' ? timestamp : ticket.lastCheckedInTime,
-          lastCheckedOutTime: newStatus === 'Outside' ? timestamp : ticket.lastCheckedOutTime,
-          lastGateName: gate,
-          lastStaffName: staff,
-        }
-      : ticket));
-
+    setTickets((previousTickets) => previousTickets.map((ticket) => {
+      if (ticket.id !== ticketId) return ticket;
+      return {
+        ...ticket,
+        status: newStatus,
+        lastCheckedInTime: newStatus === 'Inside' ? timestamp : ticket.lastCheckedInTime,
+        lastCheckedOutTime: newStatus === 'Outside' ? timestamp : ticket.lastCheckedOutTime,
+        lastGateName: gate,
+        lastStaffName: staff,
+      };
+    }));
     if (selectedEvent) {
-      setEvents((previousEvents) => previousEvents.map((event) => event.id === selectedEvent.id
-        ? {
-            ...event,
-            checkedInCount: tickets.filter((ticket) => ticket.id === ticketId ? newStatus === 'Inside' : ticket.status === 'Inside').length,
-          }
-        : event));
+      setEvents((previousEvents) => previousEvents.map((event) => event.id === selectedEvent.id ? {
+        ...event,
+        checkedInCount: tickets.filter((ticket) => ticket.id === ticketId ? newStatus === 'Inside' : ticket.status === 'Inside').length,
+      } : event));
     }
-
     let actionType = 'Status Changed';
     let badge: ActivityLogEntry['statusBadge'] = 'success';
     if (newStatus === 'Inside') { actionType = 'Checked In (Inside)'; badge = 'success'; }
@@ -342,7 +266,6 @@ export function useValidatorController() {
     else if (newStatus === 'Refunded') { actionType = 'Status Changed: Refunded'; badge = 'danger'; }
     else if (newStatus === 'Blocked') { actionType = 'Status Changed: Blocked'; badge = 'danger'; }
     else { actionType = 'Status Changed: Waiting Entry'; badge = 'info'; }
-
     const logEntry: ActivityLogEntry = {
       id: `log-${Date.now()}`,
       timestamp,
@@ -366,28 +289,29 @@ export function useValidatorController() {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const effectiveOffline = !isOnline || isSimulatedOffline;
     const foundTicket = tickets.find((ticket) => ticket.qrPayload === scannedCode || ticket.id === scannedCode);
-
     if (!foundTicket) {
       soundFX.playError();
       setActiveScanResult(null);
       return;
     }
-
     if (foundTicket.status !== 'Waiting Entry') {
       soundFX.playError();
       setActiveScanResult({ ticket: foundTicket, scanTime: timestamp, isDuplicate: foundTicket.status === 'Inside', isOfflineQueued: false });
       scheduleAutoDismiss(2500);
       return;
     }
-
     soundFX.playSuccess();
     updateTicketStatus(foundTicket.id, 'Inside', activeSession.gateName, currentUser.name, timestamp, effectiveOffline);
-    const updatedTicket: Ticket = { ...foundTicket, status: 'Inside', lastCheckedInTime: timestamp, lastGateName: activeSession.gateName, lastStaffName: currentUser.name };
+    const updatedTicket: Ticket = {
+      ...foundTicket,
+      status: 'Inside',
+      lastCheckedInTime: timestamp,
+      lastGateName: activeSession.gateName,
+      lastStaffName: currentUser.name,
+    };
     setActiveScanResult({ ticket: updatedTicket, scanTime: timestamp, isDuplicate: false, isOfflineQueued: effectiveOffline });
     scheduleAutoDismiss(1800);
   };
-
-  const handleDismissResultAndClose = handleDismissResult;
 
   const handleLogout = () => {
     clearToken();
@@ -417,9 +341,9 @@ export function useValidatorController() {
     setCurrentTab, setViewState, setPermissionError, setIsAttendeesLoading,
     setIsSimulatedOffline, setOfflineQueue, setSelectedTicketForDetail,
     setShowSessionModal, setIsContinuousScan,
-    handleDismissResult: handleDismissResultAndClose, handleSyncNow, handleSelectEvent,
-    handleStartSessionConfirm, handleScanTicket, handleLogout, handleSwitchUser,
-    toggleHighContrast, updateTicketStatus,
+    handleDismissResult, handleSyncNow, handleSelectEvent, handleStartSessionConfirm,
+    handleScanTicket, handleLogout, handleSwitchUser, toggleHighContrast,
+    updateTicketStatus,
   };
 }
 
