@@ -1,4 +1,4 @@
-import { getFreshIdToken, getLatestIdToken, setLatestIdToken, auth } from '../firebase';
+import { auth, getFreshIdToken } from '../firebase';
 
 const API_BASE_URL = "";
 
@@ -95,18 +95,21 @@ type SessionExchangeResponse = {
   customToken: string;
 };
 
-async function resolveToken(fallbackToken?: string) {
-  const freshToken = await getFreshIdToken();
-  if (freshToken) return freshToken;
+async function requireFreshFirebaseToken() {
+  const user = auth.currentUser;
+  if (!user) {
+    throw Object.assign(new Error('No authenticated Firebase user.'), {
+      status: 401,
+    });
+  }
 
-  const cachedToken = getLatestIdToken();
-  if (cachedToken) return cachedToken;
-
-  return fallbackToken ?? getStoredToken();
+  // Firebase handles persistence and token refresh. getIdToken() returns a
+  // valid current ID token and refreshes it automatically when necessary.
+  return getFreshIdToken();
 }
 
-async function fetchJson<T>(path: string, token: string, init?: RequestInit): Promise<T> {
-  const effectiveToken = await resolveToken(token);
+async function fetchJson<T>(path: string, _unusedToken?: string, init?: RequestInit): Promise<T> {
+  const effectiveToken = await requireFreshFirebaseToken();
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -135,8 +138,9 @@ async function fetchJson<T>(path: string, token: string, init?: RequestInit): Pr
   return payload as T;
 }
 
-// The callback token must be used exactly as received from BuyMesho. It may
-// represent a newly authenticated user, so do not substitute another token.
+// The callback token is intentionally accepted only for the one-time
+// BuyMesho -> Validator session exchange. It is immediately converted into
+// Firebase Auth state by signInWithCustomToken in BuyMeshoGate.
 export async function exchangeValidatorSession(token: string) {
   const response = await fetch(`${API_BASE_URL}/api/validator/session`, {
     method: "POST",
@@ -165,11 +169,11 @@ export async function exchangeValidatorSession(token: string) {
   return payload as SessionExchangeResponse;
 }
 
-export async function fetchValidatorMe(token: string) {
+export async function fetchValidatorMe(token?: string) {
   return fetchJson<ValidatorMeResponse>("/api/validator/me", token);
 }
 
-export async function fetchValidatorTickets(token: string, eventId: string) {
+export async function fetchValidatorTickets(token: string | undefined, eventId: string) {
   return fetchJson<ValidatorEventTicketsResponse>(
     `/api/validator/events/${encodeURIComponent(eventId)}/tickets`,
     token,
@@ -177,7 +181,7 @@ export async function fetchValidatorTickets(token: string, eventId: string) {
 }
 
 export async function scanTicket(
-  token: string,
+  token: string | undefined,
   input: {
     code: string;
     eventId: string;
@@ -194,7 +198,7 @@ export async function scanTicket(
 }
 
 export async function updateTicketStatus(
-  token: string,
+  token: string | undefined,
   input: {
     ticketId: string;
     eventId: string;
@@ -211,7 +215,7 @@ export async function updateTicketStatus(
 }
 
 export async function syncQueuedValidations(
-  token: string,
+  token: string | undefined,
   input: {
     queue: Array<any>;
     eventId: string;
@@ -224,23 +228,12 @@ export async function syncQueuedValidations(
   });
 }
 
-export function getStoredToken() {
-  return getLatestIdToken();
-}
-
-export function saveToken(token: string) {
-  setLatestIdToken(token);
-}
-
 export async function signOutValidator() {
-  try {
-    await auth.signOut();
-  } finally {
-    saveToken("");
-  }
+  await auth.signOut();
 }
 
 export function clearToken() {
-  saveToken("");
+  // Backward-compatible name for callers during the migration. There is no
+  // client token cache to clear anymore; Firebase Auth owns the session.
   void auth.signOut();
 }
