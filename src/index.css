@@ -124,14 +124,16 @@ img {
    reintroduce the brighter indigo/blue surface seen on the access loader and filters. */
 .bg-blue-600,
 .bg-indigo-600,
-.bg-zinc-950 {
+.bg-zinc-950,
+.bg-slate-950 {
   background-color: var(--brand-dark-surface) !important;
   color: var(--brand-dark-foreground) !important;
 }
 
 .bg-blue-700,
 .bg-indigo-700,
-.bg-zinc-800 {
+.bg-zinc-800,
+.bg-slate-800 {
   background-color: var(--brand-dark-surface-hover) !important;
   color: var(--brand-dark-foreground) !important;
 }
