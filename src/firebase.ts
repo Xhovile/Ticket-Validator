@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, onIdTokenChanged, type User } from 'firebase/auth';
+import { getAuth, onIdTokenChanged } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyDlT_IH_p6XBwEc_8gwG_2IWUXmcitAmLM',
@@ -13,34 +13,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-let latestIdToken = '';
-
-export function getLatestIdToken() {
-  return latestIdToken;
-}
-
-export function setLatestIdToken(token: string) {
-  latestIdToken = token;
-}
-
-export async function getFreshIdToken(user: User | null = auth.currentUser) {
-  if (!user) return '';
-  const token = await user.getIdToken();
-  latestIdToken = token;
-  return token;
-}
-
-// Firebase Auth owns persistence and refresh. Keep the API layer's
-// synchronous token cache aligned with Firebase's current ID token.
-onIdTokenChanged(auth, async (user) => {
-  if (!user) {
-    latestIdToken = '';
-    return;
-  }
-
-  try {
-    latestIdToken = await user.getIdToken();
-  } catch {
-    latestIdToken = '';
-  }
+// Firebase Auth is the sole client-side session authority.
+// Firebase persists the user session and automatically refreshes ID tokens.
+// The application must not maintain a second authentication/session cache.
+onIdTokenChanged(auth, () => {
+  // Intentionally empty. Registering the listener keeps Firebase's auth
+  // lifecycle active without duplicating its state anywhere else.
 });
+
+export async function getFreshIdToken(forceRefresh = false) {
+  const user = auth.currentUser;
+  if (!user) return '';
+
+  return user.getIdToken(forceRefresh);
+}
