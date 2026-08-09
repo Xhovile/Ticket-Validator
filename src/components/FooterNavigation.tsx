@@ -13,59 +13,52 @@ interface FooterNavigationProps {
 export const FooterNavigation: React.FC<FooterNavigationProps> = ({
   currentTab,
   onTabChange,
-  isScanningActive,
   hasActiveEvent,
 }) => {
-  return (
-    <div className="fixed bottom-5 left-0 right-0 z-40 px-4 pointer-events-none">
-      <div className="max-w-md mx-auto flex items-center justify-center gap-2.5 pointer-events-auto">
-        <button
-          onClick={() => onTabChange('events')}
-          className={`flex items-center gap-2 py-2.5 px-4 rounded-2xl transition-all duration-200 border shadow-sm backdrop-blur-md ${
-            currentTab === 'events'
-              ? 'bg-slate-950 text-white border-slate-950 shadow-lg shadow-slate-950/20 scale-[1.03]'
-              : 'bg-white/95 text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
-          }`}
-        >
-          <Calendar className={`w-4 h-4 transition-colors ${currentTab === 'events' ? 'text-blue-300' : 'text-slate-400'}`} />
-          <span className="text-xs tracking-tight font-medium">Events</span>
-        </button>
+  const item = (tab: NavTab, label: string, Icon: typeof Calendar, disabled = false) => {
+    const active = currentTab === tab;
+    return (
+      <button
+        type="button"
+        onClick={() => onTabChange(tab)}
+        disabled={disabled}
+        aria-current={active ? 'page' : undefined}
+        className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 transition-colors ${
+          disabled
+            ? 'cursor-not-allowed text-zinc-300'
+            : active
+              ? 'bg-zinc-950 text-white shadow-sm'
+              : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
+        }`}
+      >
+        <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={active ? 2.25 : 2} />
+        <span className="text-[11px] font-semibold">{label}</span>
+      </button>
+    );
+  };
 
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pointer-events-none sm:bottom-4 sm:px-4" aria-label="Primary navigation">
+      <div className="pointer-events-auto mx-auto flex w-full max-w-md items-center gap-1 rounded-2xl border border-zinc-200 bg-white/95 p-1.5 shadow-[0_12px_36px_-16px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+        {item('events', 'Events', Calendar)}
         <button
+          type="button"
           onClick={() => onTabChange('scan')}
           disabled={!hasActiveEvent}
-          title="Scan Tickets"
+          aria-current={currentTab === 'scan' ? 'page' : undefined}
           aria-label="Scan Tickets"
-          className={`w-16 h-14 rounded-2xl flex items-center justify-center transition-all duration-200 border shadow-lg shrink-0 ${
+          className={`flex h-11 w-14 shrink-0 items-center justify-center rounded-xl transition-colors ${
             !hasActiveEvent
-              ? 'bg-slate-100/90 text-slate-400 border-slate-200 cursor-not-allowed'
+              ? 'cursor-not-allowed bg-zinc-100 text-zinc-300'
               : currentTab === 'scan'
-              ? 'bg-blue-600 text-white border-blue-600 shadow-blue-500/20 scale-[1.03]'
-              : 'bg-slate-950 text-white border-slate-950 hover:bg-slate-900'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+                : 'bg-zinc-950 text-white hover:bg-zinc-800'
           }`}
         >
-          <ScanLine className={`w-7 h-7 transition-colors ${
-            !hasActiveEvent ? 'text-slate-400' : currentTab === 'scan' ? 'text-white' : 'text-slate-200'
-          }`} />
+          <ScanLine className="h-[21px] w-[21px]" strokeWidth={2.25} />
         </button>
-
-        <button
-          onClick={() => onTabChange('attendees')}
-          disabled={!hasActiveEvent}
-          className={`flex items-center gap-2 py-2.5 px-4 rounded-2xl transition-all duration-200 border shadow-sm backdrop-blur-md ${
-            !hasActiveEvent
-              ? 'bg-slate-100/90 text-slate-400 border-slate-200 cursor-not-allowed'
-              : currentTab === 'attendees'
-              ? 'bg-slate-950 text-white border-slate-950 shadow-lg shadow-slate-950/20 scale-[1.03]'
-              : 'bg-white/95 text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
-          }`}
-        >
-          <Users className={`w-4 h-4 transition-colors ${
-            !hasActiveEvent ? 'text-slate-400' : currentTab === 'attendees' ? 'text-blue-300' : 'text-slate-400'
-          }`} />
-          <span className="text-xs tracking-tight font-medium">Attendees</span>
-        </button>
+        {item('attendees', 'Attendees', Users, !hasActiveEvent)}
       </div>
-    </div>
+    </nav>
   );
 };
