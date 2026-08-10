@@ -162,22 +162,22 @@ export function mapValidatorTicket(ticket: ValidatorTicketRecord): Ticket {
     ),
     ticketTier: getMetadataValue(
       metadata,
-      ['ticketTier', 'ticket_tier', 'tier', 'ticketType', 'ticket_type'],
+      ['ticketTier', 'ticket_tier', 'tier', 'ticketType', 'ticket_type', 'item_title'],
       'General Admission',
     ),
     seatOrZone: getMetadataValue(
       metadata,
       ['seatOrZone', 'seat_or_zone', 'seat', 'zone'],
-      'General',
+      '',
     ),
     price: getMetadataNumber(
       metadata,
-      ['price', 'ticketPrice', 'ticket_price', 'amount'],
+      ['price', 'ticketPrice', 'ticket_price', 'amount', 'unit_price'],
       0,
     ),
     purchaseDate: getMetadataValue(
       metadata,
-      ['purchaseDate', 'purchase_date', 'createdAt', 'created_at'],
+      ['purchaseDate', 'purchase_date', 'createdAt', 'created_at', 'paid_at'],
       ticket.updated_at,
     ),
     status: ticket.status as TicketStatus,
