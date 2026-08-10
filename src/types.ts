@@ -38,14 +38,19 @@ export type TicketStatus =
   | 'Duplicate Scan Attempt';
 
 export interface Ticket {
-  id: string;              // e.g. "BMS-9401-88"
+  id: string;              // Public Ticket ID, e.g. "BM-9401-88"
   qrPayload: string;       // Unique payload encoded in QR code
   eventId: string;
+  ticketTitle: string;
   attendeeName: string;
   attendeeEmail: string;
   attendeePhone: string;
   ticketTier: string;      // e.g., "VIP Pass", "General Admission", "Early Bird"
   seatOrZone?: string;     // e.g., "Zone A - Row 12"
+  eventDate?: string;
+  startTime?: string;
+  venue?: string;
+  location?: string;
   price: number;
   purchaseDate: string;
   status: TicketStatus;
