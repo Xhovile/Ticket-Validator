@@ -27,15 +27,35 @@ function normalizeStoredSession(session: CheckInSession | null, events: EventIte
   const event = events.find((item) => item.id === session.eventId);
   if (!event) return null;
 
+  const gateName = typeof session.gateName === 'string' && session.gateName.trim()
+    ? session.gateName
+    : (event.gates?.[0] || 'Main Gate');
+
+  const eventName = typeof session.eventName === 'string' && session.eventName.trim()
+    ? session.eventName
+    : event.name;
+
+  const staffName = typeof session.staffName === 'string' && session.staffName.trim()
+    ? session.staffName
+    : 'Gate Officer';
+
+  const startTime = typeof session.startTime === 'string' && session.startTime.trim()
+    ? session.startTime
+    : new Date().toISOString();
+
+  const scanCount = typeof session.scanCount === 'number' && Number.isFinite(session.scanCount)
+    ? session.scanCount
+    : 0;
+
   return {
-    id: session.id || `session-${Date.now()}`,
+    id: typeof session.id === 'string' && session.id.trim() ? session.id : `session-${Date.now()}`,
     eventId: event.id,
-    eventName: session.eventName || event.name,
-    gateName: session.gateName || event.gates?.[0] || 'Main Gate',
-    staffName: session.staffName || 'Gate Officer',
-    startTime: session.startTime || new Date().toISOString(),
+    eventName,
+    gateName,
+    staffName,
+    startTime,
     active: session.active === true,
-    scanCount: Number.isFinite(session.scanCount) ? session.scanCount : 0,
+    scanCount,
   };
 }
 
