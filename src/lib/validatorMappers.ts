@@ -18,8 +18,26 @@ function getEventState(eventDate: string, startTime: string, status: string): Ev
 }
 
 export type ValidatorEventRecord = {
-  id: string; title: string; organizerName: string; eventDate: string; startTime: string;
-  venue: string; location: string; ticketLink: string | null; status: string; ticket_count?: number;
+  id: string;
+  title: string;
+  organizerName: string;
+  eventDate: string;
+  startTime: string;
+  venue: string;
+  location: string;
+  ticketLink: string | null;
+  status: string;
+  ticket_count?: number;
+  event_type?: string;
+  description?: string;
+  ticket_mode?: string;
+  ticket_price?: number | null;
+  contact_whatsapp?: string | null;
+  poster_alt?: string | null;
+  spec_values?: Record<string, unknown>;
+  creator_uid?: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type ValidatorTicketRecord = {
@@ -31,20 +49,35 @@ export type ValidatorTicketRecord = {
 };
 
 export function mapValidatorEvent(event: ValidatorEventRecord, organizerId = ''): EventItem {
+  const spec = event.spec_values ?? {};
+  const posterSource = {
+    poster_image_url: spec.poster_image_url ?? spec.posterImageUrl ?? event.poster_alt ?? null,
+    poster_url: spec.poster_url ?? null,
+    poster: spec.poster ?? null,
+  };
+
   return {
     id: event.id,
-    name: event.title,
-    organizerId,
-    organizerName: event.organizerName,
-    date: event.eventDate,
-    venue: event.venue,
-    city: event.location,
-    bannerImage: getValidatorEventImageUrl({}),
-    state: getEventState(event.eventDate, event.startTime, event.status),
-    totalTicketsSold: event.ticket_count || 0,
+    name: getString(event.title, 'Untitled Event'),
+    organizerId: getString(event.creator_uid, organizerId),
+    organizerName: getString(event.organizerName),
+    date: getString(event.eventDate),
+    startTime: getString(event.startTime),
+    venue: getString(event.venue),
+    city: getString(event.location),
+    bannerImage: getValidatorEventImageUrl(posterSource),
+    state: getEventState(getString(event.eventDate), getString(event.startTime), getString(event.status)),
+    totalTicketsSold: Number(event.ticket_count) || 0,
     checkedInCount: 0,
-    category: 'Event',
+    category: getString(event.event_type, 'Event'),
     gates: ['Main Gate'],
+    description: getString(event.description),
+    ticketMode: getString(event.ticket_mode),
+    ticketPrice: event.ticket_price == null ? null : Number(event.ticket_price),
+    ticketLink: event.ticketLink ?? null,
+    contactWhatsapp: event.contact_whatsapp ?? null,
+    createdAt: event.created_at,
+    updatedAt: event.updated_at,
   };
 }
 
