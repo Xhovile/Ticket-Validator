@@ -22,6 +22,23 @@ function pathForTab(tab: NavTab): string {
   return '/events';
 }
 
+function normalizeStoredSession(session: CheckInSession | null, events: EventItem[]): CheckInSession | null {
+  if (!session) return null;
+  const event = events.find((item) => item.id === session.eventId);
+  if (!event) return null;
+
+  return {
+    id: session.id || `session-${Date.now()}`,
+    eventId: event.id,
+    eventName: session.eventName || event.name,
+    gateName: session.gateName || event.gates?.[0] || 'Main Gate',
+    staffName: session.staffName || 'Gate Officer',
+    startTime: session.startTime || new Date().toISOString(),
+    active: session.active === true,
+    scanCount: Number.isFinite(session.scanCount) ? session.scanCount : 0,
+  };
+}
+
 export function useValidatorController() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -100,10 +117,10 @@ export function useValidatorController() {
         const { user, events: mappedEvents } = buildValidatorSession(response);
         setCurrentUser(user);
         setEvents(mappedEvents);
-        const storedSession = loadStoredSession();
-        const validStoredSession = storedSession && mappedEvents.some((event) => event.id === storedSession.eventId) ? storedSession : null;
-        setActiveSession(validStoredSession);
-        setSelectedEvent(mappedEvents.find((event) => event.id === validStoredSession?.eventId) || mappedEvents[0] || null);
+        const storedSession = normalizeStoredSession(loadStoredSession(), mappedEvents);
+        if (storedSession) saveStoredSession(storedSession);
+        setActiveSession(storedSession);
+        setSelectedEvent(mappedEvents.find((event) => event.id === storedSession?.eventId) || mappedEvents[0] || null);
         setCurrentTab(tabFromPathname(window.location.pathname));
         setViewState('list');
         setIsAuthenticating(false);
@@ -216,11 +233,12 @@ export function useValidatorController() {
     const session: CheckInSession = {
       id: `session-${Date.now()}`,
       eventId: selectedEvent.id,
+      eventName: selectedEvent.name,
       gateName,
-      staffId: currentUser.id,
       staffName: currentUser.name,
-      startedAt: new Date().toISOString(),
+      startTime: new Date().toISOString(),
       active: true,
+      scanCount: 0,
     };
     setActiveSession(session);
     saveStoredSession(session);
@@ -276,7 +294,7 @@ export function useValidatorController() {
       eventId: selectedEvent?.id || '',
       ticketId,
       attendeeName: targetTicket?.attendeeName,
-      action: actionType,
+      action: actionType as ActivityLogEntry['action'],
       gateName: gate,
       staffName: staff,
       statusBadge: badge,
