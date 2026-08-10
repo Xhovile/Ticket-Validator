@@ -9,33 +9,23 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  /* BuyMesho-inspired brand foundation */
   --brand-primary: #111827;
   --brand-accent: #d9a441;
   --brand-accent-strong: #b8862f;
   --brand-accent-soft: #fbf6ea;
-
-  /* Validator dark surface — the same navy used by the session-restoration screen */
   --brand-dark-surface: #020617;
   --brand-dark-surface-hover: #0f172a;
   --brand-dark-foreground: #ffffff;
-
-  /* Neutral surfaces */
   --bg: #ffffff;
   --surface: #ffffff;
   --surface-subtle: #f8f9fa;
   --surface-muted: #f3f4f6;
   --border: #e5e7eb;
   --border-strong: #d1d5db;
-
-  /* Typography */
   --text-primary: #111827;
   --text-secondary: #4b5563;
   --text-muted: #6b7280;
   --text-disabled: #9ca3af;
-
-  /* Operational states */
   --success: #16803c;
   --success-soft: #edf8f1;
   --warning: #a16207;
@@ -46,176 +36,47 @@
   --info-soft: #eff6ff;
   --purple: #6941c6;
   --purple-soft: #f5f3ff;
-
-  /* Shape and elevation */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
   --shadow-md: 0 4px 14px rgba(16, 24, 40, 0.06);
   --focus-ring: 0 0 0 3px rgba(217, 164, 65, 0.22);
-
   color-scheme: light;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
+html, body, #root { min-height: 100%; margin: 0; }
+html { background: var(--bg); }
+body { min-width: 320px; background: var(--bg); color: var(--text-primary); font-family: inherit; line-height: 1.5; }
+button, input, select, textarea { font: inherit; }
+button { color: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+img { max-width: 100%; }
+::selection { background: rgba(217, 164, 65, 0.22); color: var(--text-primary); }
+.brand-dark-surface { background: var(--brand-dark-surface); color: var(--brand-dark-foreground); }
+.brand-dark-surface:hover { background: var(--brand-dark-surface-hover); }
+.bg-blue-600, .bg-indigo-600, .bg-zinc-950, .bg-slate-950, .bg-slate-900 { background-color: var(--brand-dark-surface) !important; color: var(--brand-dark-foreground) !important; }
+.bg-blue-700, .bg-indigo-700, .bg-zinc-800, .bg-slate-800 { background-color: var(--brand-dark-surface-hover) !important; color: var(--brand-dark-foreground) !important; }
 
-html,
-body,
-#root {
-  min-height: 100%;
-  margin: 0;
-}
+/* Error recovery action: explicit high-contrast colors prevent global button rules from overriding the label/icon. */
+.validator-error-reload,
+.validator-error-reload svg,
+.validator-error-reload span { color: #ffffff !important; }
+.validator-error-reload { background-color: var(--brand-dark-surface) !important; }
+.validator-error-reload:hover { background-color: var(--brand-dark-surface-hover) !important; }
 
-html {
-  background: var(--bg);
-}
-
-body {
-  min-width: 320px;
-  background: var(--bg);
-  color: var(--text-primary);
-  font-family: inherit;
-  line-height: 1.5;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-button {
-  color: inherit;
-}
-
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-a:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-img {
-  max-width: 100%;
-}
-
-::selection {
-  background: rgba(217, 164, 65, 0.22);
-  color: var(--text-primary);
-}
-
-/* Brand dark surfaces: keep the same navy wherever the UI uses a solid blue/dark action surface. */
-.brand-dark-surface {
-  background: var(--brand-dark-surface);
-  color: var(--brand-dark-foreground);
-}
-
-.brand-dark-surface:hover {
-  background: var(--brand-dark-surface-hover);
-}
-
-/* Backstop for existing Tailwind brand-blue/dark utilities so older components cannot
-   reintroduce the brighter indigo/blue surface seen on the access loader and filters. */
-.bg-blue-600,
-.bg-indigo-600,
-.bg-zinc-950,
-.bg-slate-950,
-.bg-slate-900 {
-  background-color: var(--brand-dark-surface) !important;
-  color: var(--brand-dark-foreground) !important;
-}
-
-.bg-blue-700,
-.bg-indigo-700,
-.bg-zinc-800,
-.bg-slate-800 {
-  background-color: var(--brand-dark-surface-hover) !important;
-  color: var(--brand-dark-foreground) !important;
-}
-
-.app-surface {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-}
-
-.app-subtle-surface {
-  background: var(--surface-subtle);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-}
-
-.brand-accent {
-  color: var(--brand-accent-strong);
-}
-
-.status-success {
-  color: var(--success);
-  background: var(--success-soft);
-}
-
-.status-warning {
-  color: var(--warning);
-  background: var(--warning-soft);
-}
-
-.status-danger {
-  color: var(--danger);
-  background: var(--danger-soft);
-}
-
-.status-info {
-  color: var(--info);
-  background: var(--info-soft);
-}
-
-.status-purple {
-  color: var(--purple);
-  background: var(--purple-soft);
-}
-
-.sunlight-high-contrast {
-  --text-primary: #000000;
-  --text-secondary: #1f2937;
-  --text-muted: #374151;
-  --border: #c7cdd4;
-  --border-strong: #9ca3af;
-}
-
-@keyframes flash-green {
-  0% { background-color: rgba(22, 163, 74, 0.4); transform: scale(1.02); }
-  50% { background-color: rgba(22, 163, 74, 0.2); }
-  100% { background-color: transparent; transform: scale(1); }
-}
-
-@keyframes flash-red {
-  0% { background-color: rgba(220, 38, 38, 0.4); transform: scale(1.02); }
-  50% { background-color: rgba(220, 38, 38, 0.2); }
-  100% { background-color: transparent; transform: scale(1); }
-}
-
-.animate-flash-valid {
-  animation: flash-green 300ms ease-out forwards;
-}
-
-.animate-flash-invalid {
-  animation: flash-red 300ms ease-out forwards;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+.app-surface { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
+.app-subtle-surface { background: var(--surface-subtle); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.brand-accent { color: var(--brand-accent-strong); }
+.status-success { color: var(--success); background: var(--success-soft); }
+.status-warning { color: var(--warning); background: var(--warning-soft); }
+.status-danger { color: var(--danger); background: var(--danger-soft); }
+.status-info { color: var(--info); background: var(--info-soft); }
+.status-purple { color: var(--purple); background: var(--purple-soft); }
+.sunlight-high-contrast { --text-primary: #000000; --text-secondary: #1f2937; --text-muted: #374151; --border: #c7cdd4; --border-strong: #9ca3af; }
+@keyframes flash-green { 0% { background-color: rgba(22, 163, 74, 0.4); transform: scale(1.02); } 50% { background-color: rgba(22, 163, 74, 0.2); } 100% { background-color: transparent; transform: scale(1); } }
+@keyframes flash-red { 0% { background-color: rgba(220, 38, 38, 0.4); transform: scale(1.02); } 50% { background-color: rgba(220, 38, 38, 0.2); } 100% { background-color: transparent; transform: scale(1); } }
+.animate-flash-valid { animation: flash-green 300ms ease-out forwards; }
+.animate-flash-invalid { animation: flash-red 300ms ease-out forwards; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
