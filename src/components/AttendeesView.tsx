@@ -21,6 +21,12 @@ export const AttendeesSkeleton: React.FC = () => (
 
 const RECENT_SEARCHES_KEY = 'buymesho_recent_searches';
 
+function getTicketNumber(ticketId: string): string {
+  const parts = ticketId.split(':');
+  const number = parts[parts.length - 1];
+  return /^\d+$/.test(number) ? number : '';
+}
+
 export const AttendeesView: React.FC<AttendeesViewProps> = ({ event, tickets = [], onSelectTicket, isLoading = false }) => {
   if (isLoading || !event) return <AttendeesSkeleton />;
 
@@ -85,7 +91,7 @@ export const AttendeesView: React.FC<AttendeesViewProps> = ({ event, tickets = [
       <div className="space-y-2.5">
         <div className="relative">
           <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addRecentSearch(searchQuery)} placeholder="Search name, ticket ID, phone..." className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-xs text-slate-900 placeholder-slate-400 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-950/5" />
+          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addRecentSearch(searchQuery)} placeholder="Search name, ticket code, phone..." className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-xs text-slate-900 placeholder-slate-400 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-950/5" />
           {searchQuery && <button type="button" onClick={() => setSearchQuery('')} className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-700"><X className="h-3.5 w-3.5" /></button>}
         </div>
 
@@ -108,6 +114,7 @@ export const AttendeesView: React.FC<AttendeesViewProps> = ({ event, tickets = [
             {filteredTickets.map((t) => {
               const initials = t.attendeeName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
               const hasSeatOrZone = Boolean(t.seatOrZone?.trim());
+              const ticketNumber = getTicketNumber(t.id);
               return (
                 <button key={t.id} type="button" onClick={() => { if (searchQuery.trim()) addRecentSearch(searchQuery.trim()); onSelectTicket(t); }} className="group w-full rounded-2xl border border-slate-200 bg-white p-3.5 text-left shadow-sm transition hover:border-slate-300 hover:shadow-md active:scale-[0.995]">
                   <div className="flex items-start gap-3">
@@ -116,7 +123,7 @@ export const AttendeesView: React.FC<AttendeesViewProps> = ({ event, tickets = [
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h4 className="truncate text-xs font-semibold text-slate-950">{t.attendeeName}</h4>
-                          <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-500"><TicketIcon className="h-3 w-3 text-slate-400" /><span className="font-mono">#{t.qrPayload}</span></p>
+                          <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-500"><TicketIcon className="h-3 w-3 text-slate-400" /><span>{ticketNumber ? `Ticket ${ticketNumber}` : 'Ticket'}</span></p>
                         </div>
                         {getStatusBadge(t.status)}
                       </div>
