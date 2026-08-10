@@ -17,12 +17,25 @@ function getNumber(...values: Array<unknown>): number {
   return 0;
 }
 
-function getEventState(eventDate: string, startTime: string, status: string): EventItem['state'] {
+function getEventState(eventDate: string, startTime: string, endTime: string, runtimeMode: string, status: string): EventItem['state'] {
+  const normalizedMode = runtimeMode.toLowerCase();
+  if (normalizedMode === 'force_live') return 'Live';
+  if (normalizedMode === 'force_upcoming') return 'Upcoming';
+
   const normalizedStatus = status.toLowerCase();
   if (normalizedStatus.includes('ended') || normalizedStatus.includes('completed') || normalizedStatus.includes('cancelled') || normalizedStatus.includes('canceled')) return 'Ended';
-  const eventDateTime = new Date(`${eventDate}T${startTime}`);
-  if (Number.isNaN(eventDateTime.getTime())) return 'Upcoming';
-  return eventDateTime.getTime() <= Date.now() ? 'Live' : 'Upcoming';
+
+  const start = new Date(`${eventDate}T${startTime}`);
+  if (Number.isNaN(start.getTime())) return 'Upcoming';
+  const now = Date.now();
+  if (now < start.getTime()) return 'Upcoming';
+
+  if (endTime) {
+    const end = new Date(`${eventDate}T${endTime}`);
+    if (!Number.isNaN(end.getTime()) && now > end.getTime()) return 'Ended';
+  }
+
+  return 'Live';
 }
 
 export type ValidatorEventRecord = {
@@ -36,11 +49,17 @@ export type ValidatorEventRecord = {
   event_date?: string;
   startTime?: string;
   start_time?: string;
+  endTime?: string;
+  end_time?: string;
   venue?: string;
   location?: string;
   ticketLink?: string | null;
   ticket_link?: string | null;
   status?: string;
+  publication_status?: 'draft' | 'published' | 'paused' | 'cancelled';
+  publication_mode?: 'immediate' | 'scheduled';
+  publication_at?: string | null;
+  runtime_mode?: 'automatic' | 'force_live' | 'force_upcoming';
   ticket_count?: number | string;
   event_type?: string;
   description?: string;
@@ -61,6 +80,8 @@ export function mapValidatorEvent(event: ValidatorEventRecord, organizerId = '')
   const name = getString(event.title, event.name, event.event_title, 'Untitled Event');
   const eventDate = getString(event.eventDate, event.event_date);
   const startTime = getString(event.startTime, event.start_time);
+  const endTime = getString(event.endTime, event.end_time, spec.end_time);
+  const runtimeMode = getString(event.runtime_mode, spec.runtime_mode, 'automatic');
   const organizerName = getString(event.organizerName, event.organizer_name);
   const ticketLink = event.ticketLink ?? event.ticket_link ?? null;
   const posterSource = { poster_image_url: spec.poster_image_url ?? spec.posterImageUrl ?? event.poster_alt ?? null, poster_url: spec.poster_url ?? null, poster: spec.poster ?? null };
@@ -75,7 +96,7 @@ export function mapValidatorEvent(event: ValidatorEventRecord, organizerId = '')
     venue: getString(event.venue),
     city: getString(event.location),
     bannerImage: getValidatorEventImageUrl(posterSource),
-    state: getEventState(eventDate, startTime, getString(event.status)),
+    state: getEventState(eventDate, startTime, endTime, runtimeMode, getString(event.status)),
     totalTicketsSold: getNumber(event.ticket_count),
     checkedInCount: 0,
     category: getString(event.event_type, 'Event'),
