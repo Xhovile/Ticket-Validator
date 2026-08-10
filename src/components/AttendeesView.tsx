@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Filter, Phone, CheckCircle2, AlertTriangle, XCircle, ChevronRight, Clock, History, X, Ticket as TicketIcon } from 'lucide-react';
+import { Search, Filter, Phone, CheckCircle2, AlertTriangle, XCircle, ChevronRight, Clock, History, X, Ticket as TicketIcon, Mail } from 'lucide-react';
 import { Ticket, TicketStatus, EventItem } from '../types';
 
 interface AttendeesViewProps {
@@ -52,7 +52,7 @@ export const AttendeesView: React.FC<AttendeesViewProps> = ({ event, tickets = [
   const eventTickets = tickets.filter((t) => t.eventId === event.id);
   const filteredTickets = eventTickets.filter((t) => {
     const query = searchQuery.toLowerCase().trim();
-    const matchesQuery = !query || [t.attendeeName, t.id, t.attendeePhone, t.attendeeEmail, t.ticketTier].some((value) => value.toLowerCase().includes(query));
+    const matchesQuery = !query || [t.attendeeName, t.attendeeEmail, t.attendeePhone, t.id, t.ticketTier, t.ticketTitle, t.eventDate, t.startTime].some((value) => (value || '').toLowerCase().includes(query));
     return matchesQuery && (statusFilter === 'All' || t.status === statusFilter);
   });
 
@@ -85,7 +85,7 @@ export const AttendeesView: React.FC<AttendeesViewProps> = ({ event, tickets = [
       <div className="space-y-2.5">
         <div className="relative">
           <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addRecentSearch(searchQuery)} placeholder="Search name, ticket ID, phone..." className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-xs text-slate-900 placeholder-slate-400 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-950/5" />
+          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addRecentSearch(searchQuery)} placeholder="Search name, ticket ID, email..." className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-xs text-slate-900 placeholder-slate-400 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-950/5" />
           {searchQuery && <button type="button" onClick={() => setSearchQuery('')} className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-700"><X className="h-3.5 w-3.5" /></button>}
         </div>
 
@@ -119,17 +119,21 @@ export const AttendeesView: React.FC<AttendeesViewProps> = ({ event, tickets = [
                         </div>
                         {getStatusBadge(t.status)}
                       </div>
-                      <div className="mt-2 flex items-center gap-2 text-[10px]">
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px]">
                         <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-700">{t.ticketTier}</span>
-                        <span className="text-slate-400">·</span>
-                        <span className="truncate text-slate-500">{t.seatOrZone || 'General'}</span>
+                        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-700">{t.ticketTitle}</span>
+                        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-700">{t.eventDate || '—'}{t.startTime ? ` · ${t.startTime}` : ''}</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                    <span className="flex min-w-0 items-center gap-1.5 text-[10px] text-slate-500"><Phone className="h-3 w-3 shrink-0 text-slate-400" /><span className="truncate">{t.attendeePhone}</span></span>
+                    <span className="flex min-w-0 items-center gap-1.5 text-[10px] text-slate-500"><Mail className="h-3 w-3 shrink-0 text-slate-400" /><span className="truncate">{t.attendeeEmail || '—'}</span></span>
                     <span className="flex shrink-0 items-center gap-1 text-[10px] font-semibold text-slate-600 group-hover:text-slate-950"><span>Manage</span><ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" /></span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
+                    <span className="flex min-w-0 items-center gap-1.5"><Phone className="h-3 w-3 shrink-0 text-slate-400" /><span className="truncate">{t.attendeePhone || '—'}</span></span>
+                    <span className="truncate">{t.venue || '—'}{t.location ? ` • ${t.location}` : ''}</span>
                   </div>
                 </button>
               );
