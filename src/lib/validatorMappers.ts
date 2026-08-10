@@ -9,88 +9,37 @@ function getString(...values: Array<unknown>): string {
   return '';
 }
 
-function getNumber(...values: Array<unknown>): number {
-  for (const value of values) {
-    if (typeof value === 'number' && Number.isFinite(value)) return value;
-    if (typeof value === 'string' && value.trim()) {
-      const parsed = Number(value);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-  }
-  return 0;
-}
-
 function getEventState(eventDate: string, startTime: string, status: string): EventItem['state'] {
   const normalizedStatus = status.toLowerCase();
-
-  if (
-    normalizedStatus.includes('ended') ||
-    normalizedStatus.includes('completed') ||
-    normalizedStatus.includes('cancelled') ||
-    normalizedStatus.includes('canceled')
-  ) {
-    return 'Ended';
-  }
-
+  if (normalizedStatus.includes('ended') || normalizedStatus.includes('completed') || normalizedStatus.includes('cancelled') || normalizedStatus.includes('canceled')) return 'Ended';
   const eventDateTime = new Date(`${eventDate}T${startTime}`);
-
-  if (Number.isNaN(eventDateTime.getTime())) {
-    return 'Upcoming';
-  }
-
+  if (Number.isNaN(eventDateTime.getTime())) return 'Upcoming';
   return eventDateTime.getTime() <= Date.now() ? 'Live' : 'Upcoming';
 }
 
 export type ValidatorEventRecord = {
-  id: string;
-  title: string;
-  organizerName: string;
-  eventDate: string;
-  startTime: string;
-  venue: string;
-  location: string;
-  ticketLink: string | null;
-  status: string;
-  ticket_count?: number;
+  id: string; title: string; organizerName: string; eventDate: string; startTime: string;
+  venue: string; location: string; ticketLink: string | null; status: string; ticket_count?: number;
 };
 
 export type ValidatorTicketRecord = {
-  ticketId: string;
-  code: string;
-  ticketTitle: string;
-  ticketType: string;
-  attendeeName: string;
-  attendeeEmail: string;
-  attendeePhone: string;
-  eventDate: string;
-  startTime: string;
-  venue: string;
-  location: string;
-  seatOrZone: string;
-  status:
-    | 'Waiting Entry'
-    | 'Inside'
-    | 'Outside'
-    | 'Cancelled'
-    | 'Refunded'
-    | 'Blocked'
-    | 'Duplicate Scan Attempt';
-  purchaseDate: string;
-  updatedAt: string;
+  ticketId: string; code: string; ticketTitle: string; ticketType: string;
+  attendeeName: string; attendeeEmail: string; attendeePhone: string;
+  eventDate: string; startTime: string; venue: string; location: string; seatOrZone: string;
+  status: 'Waiting Entry' | 'Inside' | 'Outside' | 'Cancelled' | 'Refunded' | 'Blocked' | 'Duplicate Scan Attempt';
+  purchaseDate: string; updatedAt: string;
 };
 
-export function mapValidatorEvent(event: ValidatorEventRecord): EventItem {
-  const bannerImage = getValidatorEventImageUrl({});
-
+export function mapValidatorEvent(event: ValidatorEventRecord, organizerId = ''): EventItem {
   return {
     id: event.id,
     name: event.title,
-    organizerId: '',
+    organizerId,
     organizerName: event.organizerName,
     date: event.eventDate,
     venue: event.venue,
     city: event.location,
-    bannerImage,
+    bannerImage: getValidatorEventImageUrl({}),
     state: getEventState(event.eventDate, event.startTime, event.status),
     totalTicketsSold: event.ticket_count || 0,
     checkedInCount: 0,
