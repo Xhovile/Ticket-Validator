@@ -29,7 +29,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
             <p id="validator-error-description" className="mt-2 text-sm leading-6 text-slate-500">Something went wrong while loading this screen. Reload the app and try again.</p>
             <button type="button" onClick={this.handleReload} className="validator-error-reload mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#020617] px-4 py-3 text-sm font-semibold transition hover:bg-slate-800 active:scale-[0.99]">
               <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              <span>Reload Ticket Validator</span>
+              <span>Reload </span>
             </button>
             <p className="mt-3 text-[11px] leading-5 text-slate-400">If the problem continues, close the app and open Ticket Validator again.</p>
           </section>
