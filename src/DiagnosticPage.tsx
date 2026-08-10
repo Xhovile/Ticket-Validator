@@ -18,7 +18,9 @@ function extractCallbackToken() {
 function buildLoginUrl() {
   const url = new URL(import.meta.env.VITE_BUYMESHO_LOGIN_URL?.trim() || DEFAULT_BUYMESHO_LOGIN_URL);
   url.searchParams.set('returnTo', `${window.location.origin}/diagnostic`);
-  url.searchParams.set('client', 'ticket-validator-diagnostic');
+  // BuyMesho's production login callback accepts the canonical validator client id.
+  // The diagnostic is still identified by its /diagnostic return path.
+  url.searchParams.set('client', 'ticket-validator');
   url.searchParams.set('mode', 'login');
   return url.toString();
 }
