@@ -52,7 +52,7 @@ export const AttendeesView: React.FC<AttendeesViewProps> = ({ event, tickets = [
   const eventTickets = tickets.filter((t) => t.eventId === event.id);
   const filteredTickets = eventTickets.filter((t) => {
     const query = searchQuery.toLowerCase().trim();
-    const matchesQuery = !query || [t.attendeeName, t.id, t.attendeePhone, t.attendeeEmail, t.ticketTier].some((value) => value.toLowerCase().includes(query));
+    const matchesQuery = !query || [t.attendeeName, t.qrPayload, t.attendeePhone, t.attendeeEmail, t.ticketTier].some((value) => value.toLowerCase().includes(query));
     return matchesQuery && (statusFilter === 'All' || t.status === statusFilter);
   });
 
@@ -107,6 +107,7 @@ export const AttendeesView: React.FC<AttendeesViewProps> = ({ event, tickets = [
           <div className="space-y-2.5">
             {filteredTickets.map((t) => {
               const initials = t.attendeeName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+              const hasSeatOrZone = Boolean(t.seatOrZone?.trim());
               return (
                 <button key={t.id} type="button" onClick={() => { if (searchQuery.trim()) addRecentSearch(searchQuery.trim()); onSelectTicket(t); }} className="group w-full rounded-2xl border border-slate-200 bg-white p-3.5 text-left shadow-sm transition hover:border-slate-300 hover:shadow-md active:scale-[0.995]">
                   <div className="flex items-start gap-3">
@@ -115,14 +116,13 @@ export const AttendeesView: React.FC<AttendeesViewProps> = ({ event, tickets = [
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h4 className="truncate text-xs font-semibold text-slate-950">{t.attendeeName}</h4>
-                          <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-500"><TicketIcon className="h-3 w-3 text-slate-400" /><span className="font-mono">#{t.id}</span></p>
+                          <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-500"><TicketIcon className="h-3 w-3 text-slate-400" /><span className="font-mono">#{t.qrPayload}</span></p>
                         </div>
                         {getStatusBadge(t.status)}
                       </div>
                       <div className="mt-2 flex items-center gap-2 text-[10px]">
                         <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-700">{t.ticketTier}</span>
-                        <span className="text-slate-400">·</span>
-                        <span className="truncate text-slate-500">{t.seatOrZone || 'General'}</span>
+                        {hasSeatOrZone && <><span className="text-slate-400">·</span><span className="truncate text-slate-500">{t.seatOrZone}</span></>}
                       </div>
                     </div>
                   </div>
