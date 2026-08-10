@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Ticket, User, EventItem, CheckInSession } from '../types';
 import { soundFX } from '../utils/audio';
+import { scanTicket } from '../lib/buymeshoApi';
+import { mapValidatorTicket } from '../lib/validatorMappers';
+import { getStoredToken } from '../lib/buymeshoApi';
 
 type ScanResult = {
   ticket: Ticket;
@@ -43,7 +46,7 @@ export function useValidatorScanner({ selectedEvent, currentUser, activeSession,
     }, delay);
   };
 
-  const handleScanTicket = (scannedCode: string) => {
+  const handleScanTicket = async (scannedCode: string) => {
     if (!selectedEvent || !currentUser || !activeSession?.active) return;
     const now = Date.now();
     if (lastScanThrottleRef.current.code === scannedCode && now - lastScanThrottleRef.current.time < 1500) return;
@@ -59,26 +62,60 @@ export function useValidatorScanner({ selectedEvent, currentUser, activeSession,
       return;
     }
 
-    if (foundTicket.status !== 'Waiting Entry') {
-      soundFX.playError();
-      setActiveScanResult({ ticket: foundTicket, scanTime: timestamp, isDuplicate: foundTicket.status === 'Inside', isOfflineQueued: false });
-      scheduleAutoDismiss(2500);
+    if (effectiveOffline) {
+      if (foundTicket.status !== 'Waiting Entry') {
+        soundFX.playError();
+        setActiveScanResult({ ticket: foundTicket, scanTime: timestamp, isDuplicate: foundTicket.status === 'Inside', isOfflineQueued: false });
+        scheduleAutoDismiss(2500);
+        return;
+      }
+      soundFX.playSuccess();
+      updateTicketStatus(foundTicket.id, 'Inside', activeSession.gateName, currentUser.name, timestamp, true);
+      const updatedTicket = { ...foundTicket, status: 'Inside' as const, lastCheckedInTime: timestamp, lastGateName: activeSession.gateName, lastStaffName: currentUser.name };
+      setActiveScanResult({ ticket: updatedTicket, scanTime: timestamp, isDuplicate: false, isOfflineQueued: true });
+      scheduleAutoDismiss(isContinuousScan ? 1800 : 2500);
       return;
     }
 
-    soundFX.playSuccess();
-    updateTicketStatus(foundTicket.id, 'Inside', activeSession.gateName, currentUser.name, timestamp, effectiveOffline);
+    try {
+      const response = await scanTicket(getStoredToken(), {
+        code: scannedCode,
+        eventId: selectedEvent.id,
+        gateName: activeSession.gateName,
+        staffName: currentUser.name,
+        allowReentry: false,
+      });
 
-    const updatedTicket: Ticket = {
-      ...foundTicket,
-      status: 'Inside',
-      lastCheckedInTime: timestamp,
-      lastGateName: activeSession.gateName,
-      lastStaffName: currentUser.name,
-    };
+      const serverTicket = response.data?.ticket;
+      if (!serverTicket) {
+        soundFX.playError();
+        setActiveScanResult(null);
+        return;
+      }
 
-    setActiveScanResult({ ticket: updatedTicket, scanTime: timestamp, isDuplicate: false, isOfflineQueued: effectiveOffline });
-    scheduleAutoDismiss(isContinuousScan ? 1800 : 2500);
+      const authoritativeTicket = mapValidatorTicket(serverTicket, selectedEvent.id);
+      const accepted = response.data?.result === 'accepted';
+      const duplicate = response.data?.result === 'already_applied' || authoritativeTicket.status === 'Inside';
+
+      if (accepted) {
+        soundFX.playSuccess();
+        updateTicketStatus(authoritativeTicket.id, authoritativeTicket.status, activeSession.gateName, currentUser.name, timestamp, false);
+      } else {
+        soundFX.playError();
+      }
+
+      setActiveScanResult({
+        ticket: authoritativeTicket,
+        scanTime: timestamp,
+        isDuplicate: duplicate,
+        isOfflineQueued: false,
+      });
+      scheduleAutoDismiss(isContinuousScan ? 1800 : 2500);
+    } catch {
+      soundFX.playError();
+      setActiveScanResult({ ticket: foundTicket, scanTime: timestamp, isDuplicate: false, isOfflineQueued: false });
+      scheduleAutoDismiss(2500);
+    }
   };
 
   return { isContinuousScan, setIsContinuousScan, activeScanResult, handleScanTicket, handleDismissResult };
