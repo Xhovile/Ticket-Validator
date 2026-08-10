@@ -61,6 +61,9 @@ export type ValidatorEventRecord = {
   publication_at?: string | null;
   runtime_mode?: 'automatic' | 'force_live' | 'force_upcoming';
   ticket_count?: number | string;
+  tickets_sold?: number | string;
+  tickets_checked_in?: number | string;
+  tickets_remaining?: number | string;
   event_type?: string;
   description?: string;
   ticket_mode?: string;
@@ -97,8 +100,8 @@ export function mapValidatorEvent(event: ValidatorEventRecord, organizerId = '')
     city: getString(event.location),
     bannerImage: getValidatorEventImageUrl(posterSource),
     state: getEventState(eventDate, startTime, endTime, runtimeMode, getString(event.status)),
-    totalTicketsSold: getNumber(event.ticket_count),
-    checkedInCount: 0,
+    totalTicketsSold: getNumber(event.tickets_sold, event.ticket_count),
+    checkedInCount: getNumber(event.tickets_checked_in),
     category: getString(event.event_type, 'Event'),
     gates: ['Main Gate'],
     description: getString(event.description),
