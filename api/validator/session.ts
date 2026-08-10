@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const BUYMESHО_API = 'https://buymesho.onrender.com/api/validator/session';
+const BUYMESHO_API = 'https://buymesho.onrender.com/api/validator/session';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const upstream = await fetch(BUYMESHО_API, {
+    const upstream = await fetch(BUYMESHO_API, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
