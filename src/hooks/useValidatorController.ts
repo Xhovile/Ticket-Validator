@@ -179,7 +179,7 @@ export function useValidatorController() {
         setIsTicketsLoading(true);
         const response = await fetchValidatorTickets(token, selectedEvent.id);
         if (cancelled) return;
-        const mappedTickets = response.tickets.map(mapValidatorTicket);
+        const mappedTickets = response.tickets.map((ticket) => mapValidatorTicket(ticket, selectedEvent.id));
         setTickets(mappedTickets);
         setEvents((previousEvents) => previousEvents.map((event) => event.id === selectedEvent.id ? {
           ...event,
