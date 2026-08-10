@@ -14,22 +14,13 @@ export default async function handler(req, res) {
   try {
     const upstream = await fetch(BUYMESHO_API, {
       method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        Authorization: authorization,
-        'Content-Type': 'application/json',
-      },
+      headers: { Accept: 'application/json', Authorization: authorization, 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body ?? {}),
     });
-
     const text = await upstream.text();
     let payload;
-    try {
-      payload = text ? JSON.parse(text) : {};
-    } catch {
-      payload = { error: text || `BuyMesho returned HTTP ${upstream.status}` };
-    }
-
+    try { payload = text ? JSON.parse(text) : {}; }
+    catch { payload = { error: text || `BuyMesho returned HTTP ${upstream.status}` }; }
     return res.status(upstream.status).json(payload);
   } catch (error) {
     console.error('Validator session proxy failed:', error);
