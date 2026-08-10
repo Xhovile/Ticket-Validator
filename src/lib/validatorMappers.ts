@@ -99,11 +99,11 @@ export function mapValidatorEvent(event: ValidatorEventRecord): EventItem {
   };
 }
 
-export function mapValidatorTicket(ticket: ValidatorTicketRecord): Ticket {
+export function mapValidatorTicket(ticket: ValidatorTicketRecord, eventId: string): Ticket {
   return {
     id: ticket.ticketId,
     qrPayload: ticket.code,
-    eventId: '',
+    eventId,
     ticketTitle: getString(ticket.ticketTitle),
     attendeeName: getString(ticket.attendeeName, 'Ticket Holder'),
     attendeeEmail: getString(ticket.attendeeEmail),
