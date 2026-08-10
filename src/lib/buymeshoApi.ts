@@ -28,41 +28,32 @@ export type ValidatorAccessScope = {
 
 export type ValidatorEvent = {
   id: string;
-  creator_uid: string | null;
-  event_type: string;
-  event_title: string;
-  organizer_name: string;
-  event_date: string;
-  start_time: string;
+  title: string;
+  organizerName: string;
+  eventDate: string;
+  startTime: string;
   venue: string;
   location: string;
-  ticket_mode: string;
-  ticket_price: number | null;
-  ticket_link: string | null;
-  description: string;
-  contact_whatsapp: string | null;
-  poster_alt: string | null;
-  spec_values: Record<string, unknown>;
+  ticketLink: string | null;
   status: string;
-  created_at: string;
-  updated_at: string;
-  version: string;
-  ticket_count: number;
 };
 
-export type ValidatorTicket = {
-  id: string;
+export type PublicValidatorTicket = {
+  ticketId: string;
   code: string;
-  event_id: string;
-  event_title: string;
-  order_id: string;
-  buyer_id: string;
-  status: "Waiting Entry" | "Inside" | "Outside" | "Cancelled" | "Refunded" | "Blocked" | "Duplicate Scan Attempt";
-  order_status: string;
-  payment_status: string | null;
-  updated_at: string;
-  version: string;
-  metadata: Record<string, unknown>;
+  ticketTitle: string;
+  ticketType: string;
+  attendeeName: string;
+  attendeeEmail: string;
+  attendeePhone: string;
+  eventDate: string;
+  startTime: string;
+  venue: string;
+  location: string;
+  seatOrZone: string;
+  status: "Waiting Entry" | "Inside" | "Outside" | "Cancelled" | "Refunded" | "Blocked";
+  purchaseDate: string;
+  updatedAt: string;
 };
 
 export type ValidatorMeResponse = {
@@ -70,19 +61,19 @@ export type ValidatorMeResponse = {
   identity: ValidatorIdentity;
   creator?: Record<string, unknown> | null;
   access_scope: ValidatorAccessScope;
-  events: ValidatorEvent[];
+  events: Array<{ id: string; name?: string; title?: string; event_title?: string; organizer_name?: string; eventDate?: string; event_date?: string; startTime?: string; start_time?: string; venue?: string; location?: string; ticketLink?: string | null; ticket_link?: string | null; status?: string }>;
 };
 
 export type ValidatorEventTicketsResponse = {
   success?: boolean;
   event: ValidatorEvent;
-  tickets: ValidatorTicket[];
+  tickets: PublicValidatorTicket[];
   snapshot_version: string | null;
 };
 
 export type BulkSyncResult = {
   success: boolean;
-  applied: Array<{ queueId: string; ticketId: string; eventId: string; result: "accepted" | "already_applied" | "rejected"; reason?: string; serverTicket?: ValidatorTicket }>;
+  applied: Array<{ queueId: string; ticketId: string; eventId: string; result: "accepted" | "already_applied" | "rejected"; reason?: string; serverTicket?: PublicValidatorTicket }>;
   conflicts: Array<{ queueId: string; ticketId: string; eventId: string; reason: string; expectedStatus?: string; actualStatus?: string }>;
 };
 
@@ -92,7 +83,7 @@ export type ScanResponse = {
   data?: {
     result: "accepted" | "already_applied" | "rejected";
     reason: string;
-    ticket?: ValidatorTicket;
+    ticket?: PublicValidatorTicket;
     serverVersion?: string | null;
   };
 };
@@ -145,8 +136,6 @@ async function fetchJson<T>(path: string, _unusedToken?: string, init?: RequestI
   try {
     result = await requestJson<T>(path, effectiveToken, init);
   } catch (error) {
-    // Network/DNS/browser connectivity failures are deliberately propagated
-    // without touching Firebase Auth. The user remains authenticated.
     const message = error instanceof Error ? error.message : String(error);
     throw Object.assign(new Error(`Unable to reach BuyMesho Validator API: ${message}`), {
       status: 0,
@@ -154,16 +143,10 @@ async function fetchJson<T>(path: string, _unusedToken?: string, init?: RequestI
     });
   }
 
-  // A server-side 401 can mean the ID token expired between Firebase's local
-  // check and the request. Force one Firebase refresh and retry once. If the
-  // refreshed token is still rejected, treat the authorization as genuinely
-  // invalid/revoked and destroy the Firebase session.
   if (result.response.status === 401) {
     try {
       effectiveToken = await requireFreshFirebaseToken(true);
     } catch (error) {
-      // A failed token refresh is not proof of revocation. It can simply be a
-      // temporary network failure, so preserve the Firebase session.
       const message = error instanceof Error ? error.message : String(error);
       throw Object.assign(new Error(`Unable to refresh the Firebase ID token: ${message}`), {
         status: 0,
@@ -174,8 +157,6 @@ async function fetchJson<T>(path: string, _unusedToken?: string, init?: RequestI
     try {
       result = await requestJson<T>(path, effectiveToken, init);
     } catch (error) {
-      // The refreshed token exists locally, but the API may be temporarily
-      // unreachable. Again, do not sign the user out for a transport failure.
       const message = error instanceof Error ? error.message : String(error);
       throw Object.assign(new Error(`Unable to reach BuyMesho Validator API: ${message}`), {
         status: 0,
@@ -184,8 +165,6 @@ async function fetchJson<T>(path: string, _unusedToken?: string, init?: RequestI
     }
 
     if (result.response.status === 401) {
-      // The Firebase token was successfully refreshed and BuyMesho still
-      // rejected it. This is the genuinely invalid/revoked authorization case.
       await signOutValidator().catch(() => undefined);
       throw buildApiError(result.response, result.payload);
     }
@@ -193,14 +172,9 @@ async function fetchJson<T>(path: string, _unusedToken?: string, init?: RequestI
 
   if (!result.response.ok) {
     const error = buildApiError(result.response, result.payload);
-
-    // BuyMesho uses 403 here for removal/expiry of event-creator approval.
-    // Deny Validator access, but do NOT sign the user out of Firebase.
     if (error.status === 403) {
       error.status = VALIDATOR_ACCESS_DENIED_STATUS;
     }
-
-    // 5xx and network failures never destroy the Firebase session.
     throw error;
   }
 
@@ -254,7 +228,7 @@ export async function fetchValidatorMe(token?: string) {
 
 export async function fetchValidatorTickets(token: string | undefined, eventId: string) {
   return fetchJson<ValidatorEventTicketsResponse>(
-    `/api/validator/events/${encodeURIComponent(eventId)}/tickets`,
+    `/api/validator/public/events/${encodeURIComponent(eventId)}/tickets`,
     token,
   );
 }
@@ -320,7 +294,5 @@ export async function signOutValidator() {
 }
 
 export function clearToken() {
-  // Backward-compatible alias used by existing UI code. Firebase Auth remains
-  // the only session authority, so clearing the session means signing out.
   void signOutValidator();
 }
