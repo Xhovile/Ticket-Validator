@@ -6,7 +6,7 @@ interface CheckInSessionModalProps {
   event: EventItem;
   user: User;
   onClose: () => void;
-  onConfirmStartSession: (session: CheckInSession) => void;
+  onConfirmStartSession: (gateName: string) => void;
 }
 
 export const CheckInSessionModal: React.FC<CheckInSessionModalProps> = ({
@@ -20,17 +20,7 @@ export const CheckInSessionModal: React.FC<CheckInSessionModalProps> = ({
   );
 
   const handleStart = () => {
-    const newSession: CheckInSession = {
-      id: `sess-${Date.now()}`,
-      eventId: event.id,
-      eventName: event.name,
-      gateName: selectedGate,
-      staffName: user.name,
-      startTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      active: true,
-      scanCount: 0,
-    };
-    onConfirmStartSession(newSession);
+    onConfirmStartSession(selectedGate);
   };
 
   return (
