@@ -6,7 +6,7 @@ export interface User {
   email: string;
   role: UserRole;
   avatarUrl?: string;
-  assignedEventIds: string[]; // Event IDs user has permission to access
+  assignedEventIds: string[];
   assignedGate?: string;
 }
 
@@ -18,6 +18,7 @@ export interface EventItem {
   organizerId: string;
   organizerName: string;
   date: string;
+  startTime?: string;
   venue: string;
   city: string;
   bannerImage: string;
@@ -26,6 +27,13 @@ export interface EventItem {
   checkedInCount: number;
   category: string;
   gates: string[];
+  description?: string;
+  ticketMode?: string;
+  ticketPrice?: number | null;
+  ticketLink?: string | null;
+  contactWhatsapp?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type TicketStatus = 
@@ -38,15 +46,15 @@ export type TicketStatus =
   | 'Duplicate Scan Attempt';
 
 export interface Ticket {
-  id: string;              // Public Ticket ID, e.g. "BM-9401-88"
-  qrPayload: string;       // Unique payload encoded in QR code
+  id: string;
+  qrPayload: string;
   eventId: string;
   ticketTitle: string;
   attendeeName: string;
   attendeeEmail: string;
   attendeePhone: string;
-  ticketTier: string;      // e.g., "VIP Pass", "General Admission", "Early Bird"
-  seatOrZone?: string;     // e.g., "Zone A - Row 12"
+  ticketTier: string;
+  seatOrZone?: string;
   eventDate?: string;
   startTime?: string;
   venue?: string;
