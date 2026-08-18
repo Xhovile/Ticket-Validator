@@ -6,16 +6,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const authorization = req.headers.authorization;
-  if (!authorization) {
-    return res.status(401).json({ error: 'Missing Authorization Bearer token' });
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+  if (!code || code.length > 256) {
+    return res.status(400).json({ error: 'A valid Ticket Validator handoff code is required' });
   }
 
   try {
     const upstream = await fetch(BUYMESHO_API, {
       method: 'POST',
-      headers: { Accept: 'application/json', Authorization: authorization, 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body ?? {}),
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ code }),
     });
     const text = await upstream.text();
     let payload;
