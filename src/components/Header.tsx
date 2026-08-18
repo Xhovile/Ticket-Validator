@@ -54,7 +54,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   const handleHome = () => {
     setShowUserDropdown(false);
-    onHome?.();
+    if (onHome) onHome();
+    else window.location.assign('/');
   };
 
   return (
