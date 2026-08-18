@@ -23,10 +23,13 @@ interface ScannerViewProps {
 
 export const ScannerView: React.FC<ScannerViewProps> = ({ event, session, tickets, onScanTicket, onBackToEvent, onStartSessionRequest, isContinuousScan = false, onToggleContinuousScan }) => {
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const startRequestRef = useRef(0);
   const regionId = 'html5qr-code-full-region';
   const sampleTickets = tickets.slice(0, 6);
 
@@ -46,22 +49,69 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ event, session, ticket
     }
   };
 
-  useEffect(() => {
-    let html5QrCode: Html5Qrcode | null = null;
-    if (session && session.active && event.state === 'Live') {
-      try {
-        html5QrCode = new Html5Qrcode(regionId);
-        scannerRef.current = html5QrCode;
-        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-        html5QrCode.start({ facingMode: 'environment' }, config, decodedText => onScanTicket(decodedText), () => {})
-          .then(() => { setCameraActive(true); setTimeout(() => applyZoom(zoomLevel), 300); })
-          .catch(() => setCameraActive(false));
-      } catch (_) { setCameraActive(false); }
+  const stopScanner = async () => {
+    const scanner = scannerRef.current;
+    scannerRef.current = null;
+    if (!scanner) return;
+    try {
+      if (scanner.isScanning) await scanner.stop();
+    } catch (_) {}
+    try { scanner.clear(); } catch (_) {}
+  };
+
+  const getCameraErrorMessage = (error: unknown) => {
+    const message = String(error ?? '').toLowerCase();
+    if (message.includes('permission') || message.includes('notallowed') || message.includes('denied')) return 'Camera access was blocked. Allow camera permission for Ticket Validator, then tap Retry.';
+    if (message.includes('notfound') || message.includes('no camera') || message.includes('device')) return 'No usable camera was found on this device.';
+    if (message.includes('secure') || message.includes('https')) return 'Camera access requires a secure (HTTPS) connection.';
+    return 'The camera could not start. Tap Retry to try again.';
+  };
+
+  const startCamera = async () => {
+    const requestId = ++startRequestRef.current;
+    await stopScanner();
+    setCameraActive(false);
+    setCameraError(null);
+    setIsStartingCamera(true);
+
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera API unavailable');
+
+      const permissionStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      permissionStream.getTracks().forEach((track) => track.stop());
+      if (requestId !== startRequestRef.current) return;
+
+      const cameras = await Html5Qrcode.getCameras();
+      if (!cameras.length) throw new Error('No camera devices found');
+      const preferredCamera = cameras.find((camera) => /back|rear|environment/i.test(camera.label)) ?? cameras[0];
+      const scanner = new Html5Qrcode(regionId);
+      scannerRef.current = scanner;
+
+      await scanner.start(preferredCamera.id, { fps: 10, qrbox: { width: 250, height: 250 } }, (decodedText) => onScanTicket(decodedText), () => {});
+      if (requestId !== startRequestRef.current) { await stopScanner(); return; }
+
+      setCameraActive(true);
+      setCameraError(null);
+      setTimeout(() => applyZoom(zoomLevel), 300);
+    } catch (error) {
+      if (requestId !== startRequestRef.current) return;
+      setCameraActive(false);
+      setCameraError(getCameraErrorMessage(error));
+      await stopScanner();
+    } finally {
+      if (requestId === startRequestRef.current) setIsStartingCamera(false);
     }
+  };
+
+  useEffect(() => {
+    if (!(session && session.active && event.state === 'Live')) {
+      void stopScanner();
+      return;
+    }
+    void startCamera();
     return () => {
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        scannerRef.current.stop().catch(() => {}).finally(() => { scannerRef.current = null; });
-      }
+      startRequestRef.current += 1;
+      void stopScanner();
     };
   }, [session, event.state]);
 
@@ -80,7 +130,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ event, session, ticket
       <ScannerHeader gateName={session.gateName} staffName={session.staffName} scanCount={session.scanCount} onBack={onBackToEvent} />
       <div className="my-auto space-y-3 py-3">
         <ContinuousScanControl active={isContinuousScan} onToggle={onToggleContinuousScan} />
-        <ScannerViewport regionId={regionId} cameraActive={cameraActive} zoomLevel={zoomLevel} zoomOpen={isZoomOpen} onToggleZoom={() => setIsZoomOpen(v => !v)} />
+        <ScannerViewport regionId={regionId} cameraActive={cameraActive} cameraError={cameraError} isStartingCamera={isStartingCamera} onRetryCamera={() => { void startCamera(); }} zoomLevel={zoomLevel} zoomOpen={isZoomOpen} onToggleZoom={() => setIsZoomOpen(v => !v)} />
         {isZoomOpen && <ScannerZoomControl zoomLevel={zoomLevel} onZoom={applyZoom} onClose={() => setIsZoomOpen(false)} />}
         <ManualTicketEntry value={manualCode} onChange={setManualCode} onSubmit={handleManualSubmit} />
         <TestScanningTools tickets={sampleTickets} onSimulate={onScanTicket} />
