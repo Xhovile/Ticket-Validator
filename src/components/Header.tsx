@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScanLine, ShieldCheck, User as UserIcon, LogOut, Sun, Smartphone } from 'lucide-react';
+import { ScanLine, ShieldCheck, User as UserIcon, LogOut, Sun, Smartphone, Menu, ChevronRight } from 'lucide-react';
 import { User, CheckInSession } from '../types';
 import { INITIAL_USERS } from '../data/mockData';
 import { soundFX } from '../utils/audio';
@@ -10,6 +10,7 @@ interface HeaderProps {
   onSwitchUser: (newUser: User) => void;
   activeSession: CheckInSession | null;
   activeEventName?: string;
+  onHome?: () => void;
   onOpenSessionModal?: () => void;
   isHighContrast?: boolean;
   onToggleHighContrast?: () => void;
@@ -21,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSwitchUser,
   activeSession,
   activeEventName,
+  onHome,
   isHighContrast = false,
   onToggleHighContrast,
 }) => {
@@ -50,33 +52,45 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, [showUserDropdown]);
 
+  const handleHome = () => {
+    setShowUserDropdown(false);
+    if (onHome) onHome();
+    else window.location.assign('/');
+  };
+
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur-xl">
-      <div className="mx-auto flex min-h-[64px] w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-indigo-600 text-white shadow-sm shadow-indigo-600/20">
-            <ScanLine className="h-[18px] w-[18px]" strokeWidth={2.25} />
+    <header className="sticky top-0 z-40 border-b border-indigo-200/60 bg-gradient-to-r from-indigo-50/95 via-white/95 to-violet-50/90 shadow-[0_6px_24px_-20px_rgba(79,70,229,0.45)] backdrop-blur-2xl">
+      <div className="mx-auto flex min-h-[68px] w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
+        <button
+          type="button"
+          onClick={handleHome}
+          className="group flex min-w-0 items-center gap-3 rounded-xl border border-transparent px-1.5 py-1.5 text-left transition hover:border-indigo-100 hover:bg-white/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/40"
+          aria-label="Return to Events home"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-indigo-200/70 bg-indigo-600 text-white shadow-[0_7px_16px_-8px_rgba(79,70,229,0.65)] transition group-hover:-translate-y-0.5 group-hover:shadow-[0_9px_18px_-8px_rgba(79,70,229,0.72)]">
+            <ScanLine className="h-[19px] w-[19px]" strokeWidth={2.25} />
           </div>
           <div className="min-w-0 leading-none">
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">BuyMesho</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-700">BuyMesho</span>
               <span className="h-1 w-1 rounded-full bg-amber-500" />
             </div>
-            <div className="mt-1 flex min-w-0 items-center gap-2">
+            <div className="mt-1 flex min-w-0 items-center gap-1.5">
               <h1 className="truncate text-[13px] font-semibold tracking-tight text-zinc-950">Ticket Validator</h1>
               {activeEventName && (
                 <>
-                  <span className="hidden text-zinc-300 sm:inline">/</span>
+                  <span className="hidden text-indigo-300 sm:inline">/</span>
                   <span className="hidden max-w-[220px] truncate text-xs font-medium text-zinc-500 sm:inline">{activeEventName}</span>
                 </>
               )}
             </div>
           </div>
-        </div>
+          <ChevronRight className="hidden h-4 w-4 shrink-0 text-indigo-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-500 sm:block" />
+        </button>
 
         <div className="flex shrink-0 items-center gap-2">
           {activeSession?.active && (
-            <div className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 sm:flex">
+            <div className="hidden items-center gap-2 rounded-full border border-emerald-200/80 bg-emerald-50/85 px-3 py-1.5 shadow-sm sm:flex">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-600" />
@@ -90,23 +104,16 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={() => setShowUserDropdown((open) => !open)}
-                className={`flex min-h-9 items-center gap-2 rounded-[10px] border bg-white p-1 pl-2 transition focus:outline-none ${showUserDropdown ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
+                className={`flex h-10 w-10 items-center justify-center rounded-xl border bg-white/75 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/40 ${showUserDropdown ? 'border-indigo-300 bg-white shadow-[0_7px_16px_-10px_rgba(79,70,229,0.55)]' : 'border-indigo-100/90 shadow-[0_5px_14px_-10px_rgba(15,23,42,0.45)] hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-white hover:shadow-[0_8px_18px_-10px_rgba(15,23,42,0.48)]'}`}
                 aria-expanded={showUserDropdown}
                 aria-haspopup="menu"
+                aria-label="Open account menu"
               >
-                <div className="hidden max-w-[110px] text-right sm:block">
-                  <div className="truncate text-[11px] font-semibold leading-tight text-zinc-900">{user.name}</div>
-                  <div className="mt-0.5 text-[10px] capitalize leading-tight text-zinc-500">{user.role === 'organizer' ? 'Organizer' : 'Gate Staff'}</div>
-                </div>
-                {user.avatarUrl ? (
-                  <img src={user.avatarUrl} alt={user.name} className="h-7 w-7 rounded-lg border border-zinc-200 object-cover" />
-                ) : (
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-xs font-bold text-indigo-700">{user.name.charAt(0)}</div>
-                )}
+                <Menu className="h-[19px] w-[19px] text-zinc-800" strokeWidth={2.1} />
               </button>
 
               {showUserDropdown && (
-                <div className="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-xl border border-zinc-200 bg-white p-2 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.22)]" role="menu">
+                <div className="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-indigo-100 bg-white/95 p-2 shadow-[0_20px_48px_-20px_rgba(15,23,42,0.3)] backdrop-blur-xl" role="menu">
                   <div className="border-b border-zinc-100 px-3 py-2.5">
                     <div className="flex items-center gap-3">
                       {user.avatarUrl ? (
@@ -125,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </div>
 
-                  <div className="my-1.5 space-y-2 rounded-lg bg-zinc-50 p-2.5">
+                  <div className="my-1.5 space-y-2 rounded-xl bg-zinc-50/90 p-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5">
                         <div className={`rounded-lg p-1.5 ${isHighContrast ? 'bg-amber-100 text-amber-700' : 'bg-white text-zinc-500 ring-1 ring-zinc-200'}`}><Sun className="h-3.5 w-3.5" /></div>
